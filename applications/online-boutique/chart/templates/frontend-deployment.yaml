@@ -1,0 +1,82 @@
+{{- if .Values.frontend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    {{- include "online-boutique.labels" . | nindent 4 }}
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: frontend
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/part-of: online-boutique
+    spec:
+      serviceAccountName: frontend
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: frontend
+          image: "{{ .Values.global.imageRepository }}/{{ .Values.frontend.image.name }}:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.containerPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.frontend.containerPort | quote }}
+            - name: PRODUCT_CATALOG_SERVICE_ADDR
+              value: {{ .Values.frontend.dependencies.productCatalogService | quote }}
+            - name: CURRENCY_SERVICE_ADDR
+              value: {{ .Values.frontend.dependencies.currencyService | quote }}
+            - name: CART_SERVICE_ADDR
+              value: {{ .Values.frontend.dependencies.cartService | quote }}
+            - name: RECOMMENDATION_SERVICE_ADDR
+              value: {{ .Values.frontend.dependencies.recommendationService | quote }}
+            - name: SHIPPING_SERVICE_ADDR
+              value: {{ .Values.frontend.dependencies.shippingService | quote }}
+            - name: CHECKOUT_SERVICE_ADDR
+              value: {{ .Values.frontend.dependencies.checkoutService | quote }}
+            - name: AD_SERVICE_ADDR
+              value: {{ .Values.frontend.dependencies.adService | quote }}
+            - name: SHOPPING_ASSISTANT_SERVICE_ADDR
+              value: {{ .Values.frontend.dependencies.shoppingAssistantService | quote }}
+            - name: ENABLE_PROFILER
+              value: "0"
+          readinessProbe:
+            initialDelaySeconds: {{ .Values.frontend.probes.readiness.initialDelaySeconds }}
+            httpGet:
+              path: /_healthz
+              port: http
+              httpHeaders:
+                - name: Cookie
+                  value: "shop_session-id=x-readiness-probe"
+          livenessProbe:
+            initialDelaySeconds: {{ .Values.frontend.probes.liveness.initialDelaySeconds }}
+            httpGet:
+              path: /_healthz
+              port: http
+              httpHeaders:
+                - name: Cookie
+                  value: "shop_session-id=x-liveness-probe"
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+{{- end }}

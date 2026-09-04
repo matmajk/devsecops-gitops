@@ -33,3 +33,4 @@ frontend:
     shippingService: "shippingservice:50051"
     checkoutService: "checkoutservice:5050"
     adService: "adservice:9555"
+    shoppingAssistantService: "shoppingassistantservice:80"
