@@ -1,0 +1,35 @@
+global:
+  imageRepository: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo
+  imageTag: "v0.10.6"
+  imagePullPolicy: IfNotPresent
+
+frontend:
+  enabled: true
+  image:
+    name: frontend
+  replicaCount: 1
+  containerPort: 8080
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  probes:
+    readiness:
+      initialDelaySeconds: 10
+    liveness:
+      initialDelaySeconds: 10
+  dependencies:
+    productCatalogService: "productcatalogservice:3550"
+    currencyService: "currencyservice:7000"
+    cartService: "cartservice:7070"
+    recommendationService: "recommendationservice:8080"
+    shippingService: "shippingservice:50051"
+    checkoutService: "checkoutservice:5050"
+    adService: "adservice:9555"
