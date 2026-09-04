@@ -1,0 +1,6 @@
+apiVersion: v2
+name: online-boutique
+description: Helm chart for deploying the Online Boutique microservices application
+type: application
+version: 0.1.0
+appVersion: "v0.10.6"
