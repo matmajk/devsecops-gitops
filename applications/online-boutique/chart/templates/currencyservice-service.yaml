@@ -1,0 +1,19 @@
+{{- if .Values.currencyService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: currencyservice
+  labels:
+    {{- include "online-boutique.labels" . | nindent 4 }}
+    app.kubernetes.io/name: currencyservice
+    app.kubernetes.io/component: catalog
+spec:
+  type: {{ .Values.currencyService.service.type }}
+  selector:
+    app.kubernetes.io/name: currencyservice
+  ports:
+    - name: grpc
+      port: {{ .Values.currencyService.service.port }}
+      targetPort: {{ .Values.currencyService.service.targetPort }}
+      protocol: TCP
+{{- end }}
