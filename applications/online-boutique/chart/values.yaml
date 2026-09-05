@@ -139,3 +139,29 @@ redisCart:
     limits:
       cpu: 125m
       memory: 256Mi
+
+cartService:
+  enabled: true
+  image:
+    name: cartservice
+  replicaCount: 1
+  containerPort: 7070
+  service:
+    type: ClusterIP
+    port: 7070
+    targetPort: 7070
+  dependencies:
+    redis: "redis-cart:6379"
+  probes:
+    readiness:
+      initialDelaySeconds: 15
+    liveness:
+      initialDelaySeconds: 15
+      periodSeconds: 10
+  resources:
+    requests:
+      cpu: 200m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 128Mi

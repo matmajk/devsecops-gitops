@@ -2,20 +2,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: rediscart
+  name: redis-cart
   labels:
     {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: rediscart
+    app.kubernetes.io/name: redis-cart
     app.kubernetes.io/component: cart-database
 spec:
   replicas: {{ .Values.redisCart.replicaCount }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: rediscart
+      app.kubernetes.io/name: redis-cart
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: rediscart
+        app.kubernetes.io/name: redis-cart
         app.kubernetes.io/component: cart-database
         app.kubernetes.io/part-of: online-boutique
     spec:
