@@ -1,0 +1,58 @@
+{{- if .Values.cartService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cartservice
+  labels:
+    {{- include "online-boutique.labels" . | nindent 4 }}
+    app.kubernetes.io/name: cartservice
+    app.kubernetes.io/component: cart
+spec:
+  replicas: {{ .Values.cartService.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cartservice
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cartservice
+        app.kubernetes.io/component: cart
+        app.kubernetes.io/part-of: online-boutique
+    spec:
+      serviceAccountName: cartservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: cartservice
+          image: "{{ .Values.global.imageRepository }}/{{ .Values.cartService.image.name }}:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.cartService.containerPort }}
+              protocol: TCP
+          env:
+            - name: REDIS_ADDR
+              value: {{ .Values.cartService.dependencies.redis | quote }}
+          readinessProbe:
+            initialDelaySeconds: {{ .Values.cartService.probes.readiness.initialDelaySeconds }}
+            grpc:
+              port: {{ .Values.cartService.containerPort }}
+          livenessProbe:
+            initialDelaySeconds: {{ .Values.cartService.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.cartService.probes.liveness.periodSeconds }}
+            grpc:
+              port: {{ .Values.cartService.containerPort }}
+          resources:
+            {{- toYaml .Values.cartService.resources | nindent 12 }}
+{{- end }}

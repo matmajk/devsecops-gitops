@@ -1,0 +1,19 @@
+{{- if .Values.redisCart.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cart
+  labels:
+    {{- include "online-boutique.labels" . | nindent 4 }}
+    app.kubernetes.io/name: redis-cart
+    app.kubernetes.io/component: cart-database
+spec:
+  type: {{ .Values.redisCart.service.type }}
+  selector:
+    app.kubernetes.io/name: redis-cart
+  ports:
+    - name: tcp-redis
+      port: {{ .Values.redisCart.service.port }}
+      targetPort: {{ .Values.redisCart.service.targetPort }}
+      protocol: TCP
+{{- end }}

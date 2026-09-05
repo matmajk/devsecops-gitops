@@ -12,16 +12,18 @@ Implemented workloads:
 - currencyservice
 - recommendationservice
 - adservice
+- redis-cart
+- cartservice
 
 Additional microservices will be introduced incrementally.
 
 ## Current Application Slice
 
-The currently implemented workloads provide the catalog-related
-services used by the Online Boutique frontend.
+The current implementation provides catalog browsing and
+cart persistence using Cart Service backed by Redis.
 
-Cart and checkout functionality will be introduced in subsequent
-increments.
+The local Redis deployment uses ephemeral storage and is
+intended for development and integration testing.
 
 ## Local Installation
 

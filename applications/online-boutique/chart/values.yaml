@@ -115,3 +115,53 @@ adService:
     limits:
       cpu: 300m
       memory: 300Mi
+
+redisCart:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7.4.11-alpine3.21"
+  replicaCount: 1
+  containerPort: 6379
+  service:
+    type: ClusterIP
+    port: 6379
+    targetPort: 6379
+  probes:
+    readiness:
+      periodSeconds: 5
+    liveness:
+      periodSeconds: 5
+  resources:
+    requests:
+      cpu: 70m
+      memory: 200Mi
+    limits:
+      cpu: 125m
+      memory: 256Mi
+
+cartService:
+  enabled: true
+  image:
+    name: cartservice
+  replicaCount: 1
+  containerPort: 7070
+  service:
+    type: ClusterIP
+    port: 7070
+    targetPort: 7070
+  dependencies:
+    redis: "redis-cart:6379"
+  probes:
+    readiness:
+      initialDelaySeconds: 15
+    liveness:
+      initialDelaySeconds: 15
+      periodSeconds: 10
+  resources:
+    requests:
+      cpu: 200m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 128Mi
