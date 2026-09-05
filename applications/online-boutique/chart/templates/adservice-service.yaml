@@ -1,0 +1,19 @@
+{{- if .Values.adService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: adservice
+  labels:
+    {{- include "online-boutique.labels" . | nindent 4 }}
+    app.kubernetes.io/name: adservice
+    app.kubernetes.io/component: catalog
+spec:
+  type: {{ .Values.adService.service.type }}
+  selector:
+    app.kubernetes.io/name: adservice
+  ports:
+    - name: grpc
+      port: {{ .Values.adService.service.port }}
+      targetPort: {{ .Values.adService.service.targetPort }}
+      protocol: TCP
+{{- end }}

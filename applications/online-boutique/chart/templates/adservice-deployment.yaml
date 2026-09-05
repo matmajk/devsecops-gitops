@@ -1,0 +1,59 @@
+{{- if .Values.adService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adservice
+  labels:
+    {{- include "online-boutique.labels" . | nindent 4 }}
+    app.kubernetes.io/name: adservice
+    app.kubernetes.io/component: catalog
+spec:
+  replicas: {{ .Values.adService.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: adservice
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: adservice
+        app.kubernetes.io/component: catalog
+        app.kubernetes.io/part-of: online-boutique
+    spec:
+      serviceAccountName: adservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: adservice
+          image: "{{ .Values.global.imageRepository }}/{{ .Values.adService.image.name }}:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.adService.containerPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.adService.containerPort | quote }}
+          readinessProbe:
+            initialDelaySeconds: {{ .Values.adService.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.adService.probes.readiness.periodSeconds }}
+            grpc:
+              port: {{ .Values.adService.containerPort }}
+          livenessProbe:
+            initialDelaySeconds: {{ .Values.adService.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.adService.probes.liveness.periodSeconds }}
+            grpc:
+              port: {{ .Values.adService.containerPort }}
+          resources:
+            {{- toYaml .Values.adService.resources | nindent 12 }}
+{{- end }}
