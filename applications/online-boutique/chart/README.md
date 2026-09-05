@@ -14,13 +14,14 @@ Implemented workloads:
 - adservice
 - redis-cart
 - cartservice
+- shippingservice
 
 Additional microservices will be introduced incrementally.
 
 ## Current Application Slice
 
-The current implementation provides catalog browsing and
-cart persistence using Cart Service backed by Redis.
+The current implementation supports product browsing,
+cart persistence and shipping cost calculation.
 
 The local Redis deployment uses ephemeral storage and is
 intended for development and integration testing.

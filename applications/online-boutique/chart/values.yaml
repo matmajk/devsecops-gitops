@@ -165,3 +165,26 @@ cartService:
     limits:
       cpu: 300m
       memory: 128Mi
+
+shippingService:
+  enabled: true
+  image:
+    name: shippingservice
+  replicaCount: 1
+  containerPort: 50051
+  service:
+    type: ClusterIP
+    port: 50051
+    targetPort: 50051
+  probes:
+    readiness:
+      periodSeconds: 5
+    liveness:
+      periodSeconds: 10
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

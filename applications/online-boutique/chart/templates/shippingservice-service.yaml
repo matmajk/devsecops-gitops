@@ -1,0 +1,19 @@
+{{- if .Values.shippingService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: shippingservice
+  labels:
+    {{- include "online-boutique.labels" . | nindent 4 }}
+    app.kubernetes.io/name: shippingservice
+    app.kubernetes.io/component: shipping
+spec:
+  type: {{ .Values.shippingService.service.type }}
+  selector:
+    app.kubernetes.io/name: shippingservice
+  ports:
+    - name: grpc
+      port: {{ .Values.shippingService.service.port }}
+      targetPort: {{ .Values.shippingService.service.targetPort }}
+      protocol: TCP
+{{- end }}
