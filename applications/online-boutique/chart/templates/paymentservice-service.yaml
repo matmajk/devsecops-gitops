@@ -1,0 +1,19 @@
+{{- if .Values.paymentService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: paymentservice
+  labels:
+    {{- include "online-boutique.labels" . | nindent 4 }}
+    app.kubernetes.io/name: paymentservice
+    app.kubernetes.io/component: payment
+spec:
+  type: {{ .Values.paymentService.service.type }}
+  selector:
+    app.kubernetes.io/name: paymentservice
+  ports:
+    - name: grpc
+      port: {{ .Values.paymentService.service.port }}
+      targetPort: {{ .Values.paymentService.service.targetPort }}
+      protocol: TCP
+{{- end }}

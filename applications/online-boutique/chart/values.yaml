@@ -188,3 +188,44 @@ shippingService:
     limits:
       cpu: 200m
       memory: 128Mi
+
+paymentService:
+  enabled: true
+  image:
+    name: paymentservice
+  replicaCount: 1
+  containerPort: 50051
+  service:
+    type: ClusterIP
+    port: 50051
+    targetPort: 50051
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+emailService:
+  enabled: true
+  image:
+    name: emailservice
+  replicaCount: 1
+  containerPort: 8080
+  service:
+    type: ClusterIP
+    port: 5000
+    targetPort: 8080
+  probes:
+    readiness:
+      periodSeconds: 5
+    liveness:
+      periodSeconds: 5
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

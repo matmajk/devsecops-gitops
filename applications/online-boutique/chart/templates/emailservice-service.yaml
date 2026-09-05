@@ -1,0 +1,19 @@
+{{- if .Values.emailService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: emailservice
+  labels:
+    {{- include "online-boutique.labels" . | nindent 4 }}
+    app.kubernetes.io/name: emailservice
+    app.kubernetes.io/component: email
+spec:
+  type: {{ .Values.emailService.service.type }}
+  selector:
+    app.kubernetes.io/name: emailservice
+  ports:
+    - name: grpc
+      port: {{ .Values.emailService.service.port }}
+      targetPort: {{ .Values.emailService.service.targetPort }}
+      protocol: TCP
+{{- end }}
