@@ -8,8 +8,20 @@ application as part of the DevSecOps platform.
 Implemented workloads:
 
 - frontend
+- productcatalogservice
+- currencyservice
+- recommendationservice
+- adservice
 
 Additional microservices will be introduced incrementally.
+
+## Current Application Slice
+
+The currently implemented workloads provide the catalog-related
+services used by the Online Boutique frontend.
+
+Cart and checkout functionality will be introduced in subsequent
+increments.
 
 ## Local Installation
 

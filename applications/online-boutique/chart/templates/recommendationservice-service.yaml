@@ -1,0 +1,19 @@
+{{- if .Values.recommendationService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: recommendationservice
+  labels:
+    {{- include "online-boutique.labels" . | nindent 4 }}
+    app.kubernetes.io/name: recommendationservice
+    app.kubernetes.io/component: catalog
+spec:
+  type: {{ .Values.recommendationService.service.type }}
+  selector:
+    app.kubernetes.io/name: recommendationservice
+  ports:
+    - name: grpc
+      port: {{ .Values.recommendationService.service.port }}
+      targetPort: {{ .Values.recommendationService.service.targetPort }}
+      protocol: TCP
+{{- end }}

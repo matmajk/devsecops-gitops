@@ -1,6 +1,6 @@
 global:
   imageRepository: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo
-  imageTag: "v0.10.6"
+  imageTag: 'v0.10.6'
   imagePullPolicy: IfNotPresent
 
 frontend:
@@ -26,11 +26,92 @@ frontend:
     liveness:
       initialDelaySeconds: 10
   dependencies:
-    productCatalogService: "productcatalogservice:3550"
-    currencyService: "currencyservice:7000"
-    cartService: "cartservice:7070"
-    recommendationService: "recommendationservice:8080"
-    shippingService: "shippingservice:50051"
-    checkoutService: "checkoutservice:5050"
-    adService: "adservice:9555"
-    shoppingAssistantService: "shoppingassistantservice:80"
+    productCatalogService: 'productcatalogservice:3550'
+    currencyService: 'currencyservice:7000'
+    cartService: 'cartservice:7070'
+    recommendationService: 'recommendationservice:8080'
+    shippingService: 'shippingservice:50051'
+    checkoutService: 'checkoutservice:5050'
+    adService: 'adservice:9555'
+    shoppingAssistantService: 'shoppingassistantservice:80'
+
+productCatalogService:
+  enabled: true
+  image:
+    name: productcatalogservice
+  replicaCount: 1
+  containerPort: 3550
+  service:
+    type: ClusterIP
+    port: 3550
+    targetPort: 3550
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+currencyService:
+  enabled: true
+  image:
+    name: currencyservice
+  replicaCount: 1
+  containerPort: 7000
+  service:
+    type: ClusterIP
+    port: 7000
+    targetPort: 7000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+recommendationService:
+  enabled: true
+  image:
+    name: recommendationservice
+  replicaCount: 1
+  containerPort: 8080
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+  dependencies:
+    productCatalogService: 'productcatalogservice:3550'
+  resources:
+    requests:
+      cpu: 100m
+      memory: 220Mi
+    limits:
+      cpu: 200m
+      memory: 450Mi
+
+adService:
+  enabled: true
+  image:
+    name: adservice
+  replicaCount: 1
+  containerPort: 9555
+  service:
+    type: ClusterIP
+    port: 9555
+    targetPort: 9555
+  probes:
+    readiness:
+      initialDelaySeconds: 20
+      periodSeconds: 15
+    liveness:
+      initialDelaySeconds: 20
+      periodSeconds: 15
+  resources:
+    requests:
+      cpu: 200m
+      memory: 180Mi
+    limits:
+      cpu: 300m
+      memory: 300Mi

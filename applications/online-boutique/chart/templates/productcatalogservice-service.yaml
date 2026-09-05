@@ -1,0 +1,19 @@
+{{- if .Values.productCatalogService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: productcatalogservice
+  labels:
+    {{- include "online-boutique.labels" . | nindent 4 }}
+    app.kubernetes.io/name: productcatalogservice
+    app.kubernetes.io/component: catalog
+spec:
+  type: {{ .Values.productCatalogService.service.type }}
+  selector:
+    app.kubernetes.io/name: productcatalogservice
+  ports:
+    - name: grpc
+      port: {{ .Values.productCatalogService.service.port }}
+      targetPort: {{ .Values.productCatalogService.service.targetPort }}
+      protocol: TCP
+{{- end }}
