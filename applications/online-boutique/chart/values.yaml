@@ -229,3 +229,28 @@ emailService:
     limits:
       cpu: 200m
       memory: 128Mi
+
+checkoutService:
+  enabled: true
+  image:
+    name: checkoutservice
+  replicaCount: 1
+  containerPort: 5050
+  service:
+    type: ClusterIP
+    port: 5050
+    targetPort: 5050
+  dependencies:
+    productCatalogService: "productcatalogservice:3550"
+    shippingService: "shippingservice:50051"
+    paymentService: "paymentservice:50051"
+    emailService: "emailservice:5000"
+    currencyService: "currencyservice:7000"
+    cartService: "cartservice:7070"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
