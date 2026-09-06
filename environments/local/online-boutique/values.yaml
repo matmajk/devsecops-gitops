@@ -3,5 +3,5 @@ frontend:
 
 loadGenerator:
   enabled: true
-  users: 10
+  users: 12
   rate: 1
