@@ -15,13 +15,30 @@ Implemented workloads:
 - redis-cart
 - cartservice
 - shippingservice
+- paymentservice
+- emailservice
+- checkoutservice
+
+### Diagram
+```text
+Frontend
+└── Checkout Service
+    ├── Cart Service ── Redis
+    ├── Product Catalog
+    ├── Currency Service
+    ├── Payment Service
+    ├── Shipping Service
+    └── Email Service
+```
 
 Additional microservices will be introduced incrementally.
 
 ## Current Application Slice
 
-The current implementation supports product browsing,
-cart persistence and shipping cost calculation.
+The current Helm chart supports the complete core Online Boutique
+purchase flow, including product browsing, cart persistence,
+shipping calculation, payment processing, checkout orchestration
+and order confirmation.
 
 The local Redis deployment uses ephemeral storage and is
 intended for development and integration testing.

@@ -1,0 +1,57 @@
+{{- if .Values.paymentService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paymentservice
+  labels:
+    {{- include "online-boutique.labels" . | nindent 4 }}
+    app.kubernetes.io/name: paymentservice
+    app.kubernetes.io/component: payment
+spec:
+  replicas: {{ .Values.paymentService.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: paymentservice
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: paymentservice
+        app.kubernetes.io/component: payment
+        app.kubernetes.io/part-of: online-boutique
+    spec:
+      serviceAccountName: paymentservice
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: paymentservice
+          image: "{{ .Values.global.imageRepository }}/{{ .Values.paymentService.image.name }}:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.paymentService.containerPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.paymentService.containerPort | quote }}
+            - name: DISABLE_PROFILER
+              value: "1"
+          readinessProbe:
+            grpc:
+              port: {{ .Values.paymentService.containerPort }}
+          livenessProbe:
+            grpc:
+              port: {{ .Values.paymentService.containerPort }}
+          resources:
+            {{- toYaml .Values.paymentService.resources | nindent 12 }}
+{{- end }}

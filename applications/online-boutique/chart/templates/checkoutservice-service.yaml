@@ -1,0 +1,19 @@
+{{- if .Values.checkoutService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkoutservice
+  labels:
+    {{- include "online-boutique.labels" . | nindent 4 }}
+    app.kubernetes.io/name: checkoutservice
+    app.kubernetes.io/component: checkout
+spec:
+  type: {{ .Values.checkoutService.service.type }}
+  selector:
+    app.kubernetes.io/name: checkoutservice
+  ports:
+    - name: grpc
+      port: {{ .Values.checkoutService.service.port }}
+      targetPort: {{ .Values.checkoutService.service.targetPort }}
+      protocol: TCP
+{{- end }}
