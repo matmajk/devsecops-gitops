@@ -1,0 +1,810 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Online Boutique Helm Values",
+  "description": "Configuration schema for the Online Boutique Helm chart.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "global",
+    "frontend",
+    "productCatalogService",
+    "currencyService",
+    "recommendationService",
+    "adService",
+    "redisCart",
+    "cartService",
+    "shippingService",
+    "paymentService",
+    "emailService",
+    "checkoutService"
+  ],
+  "properties": {
+    "global": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "imageRepository",
+        "imageTag",
+        "imagePullPolicy",
+        "podSecurityContext",
+        "containerSecurityContext"
+      ],
+      "properties": {
+        "imageRepository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "imageTag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "imagePullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        },
+        "podSecurityContext": {
+          "$ref": "#/definitions/podSecurityContext"
+        },
+        "containerSecurityContext": {
+          "$ref": "#/definitions/containerSecurityContext"
+        }
+      }
+    },
+
+    "frontend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "image",
+        "replicaCount",
+        "containerPort",
+        "service",
+        "resources",
+        "probes",
+        "dependencies"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "$ref": "#/definitions/applicationImage"
+        },
+        "replicaCount": {
+          "$ref": "#/definitions/replicaCount"
+        },
+        "containerPort": {
+          "$ref": "#/definitions/port"
+        },
+        "service": {
+          "$ref": "#/definitions/service"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        },
+        "probes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "readiness",
+            "liveness"
+          ],
+          "properties": {
+            "readiness": {
+              "$ref": "#/definitions/delayedProbe"
+            },
+            "liveness": {
+              "$ref": "#/definitions/delayedProbe"
+            }
+          }
+        },
+        "dependencies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "productCatalogService",
+            "currencyService",
+            "cartService",
+            "recommendationService",
+            "shippingService",
+            "checkoutService",
+            "adService",
+            "shoppingAssistantService"
+          ],
+          "properties": {
+            "productCatalogService": {
+              "$ref": "#/definitions/serviceAddress"
+            },
+            "currencyService": {
+              "$ref": "#/definitions/serviceAddress"
+            },
+            "cartService": {
+              "$ref": "#/definitions/serviceAddress"
+            },
+            "recommendationService": {
+              "$ref": "#/definitions/serviceAddress"
+            },
+            "shippingService": {
+              "$ref": "#/definitions/serviceAddress"
+            },
+            "checkoutService": {
+              "$ref": "#/definitions/serviceAddress"
+            },
+            "adService": {
+              "$ref": "#/definitions/serviceAddress"
+            },
+            "shoppingAssistantService": {
+              "$ref": "#/definitions/serviceAddress"
+            }
+          }
+        }
+      }
+    },
+
+    "productCatalogService": {
+      "$ref": "#/definitions/basicApplicationService"
+    },
+
+    "currencyService": {
+      "$ref": "#/definitions/basicApplicationService"
+    },
+
+    "recommendationService": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "image",
+        "replicaCount",
+        "containerPort",
+        "service",
+        "dependencies",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "$ref": "#/definitions/applicationImage"
+        },
+        "replicaCount": {
+          "$ref": "#/definitions/replicaCount"
+        },
+        "containerPort": {
+          "$ref": "#/definitions/port"
+        },
+        "service": {
+          "$ref": "#/definitions/service"
+        },
+        "dependencies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "productCatalogService"
+          ],
+          "properties": {
+            "productCatalogService": {
+              "$ref": "#/definitions/serviceAddress"
+            }
+          }
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    },
+
+    "adService": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "image",
+        "replicaCount",
+        "containerPort",
+        "service",
+        "probes",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "$ref": "#/definitions/applicationImage"
+        },
+        "replicaCount": {
+          "$ref": "#/definitions/replicaCount"
+        },
+        "containerPort": {
+          "$ref": "#/definitions/port"
+        },
+        "service": {
+          "$ref": "#/definitions/service"
+        },
+        "probes": {
+          "$ref": "#/definitions/timedProbes"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    },
+
+    "redisCart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "image",
+        "replicaCount",
+        "containerPort",
+        "service",
+        "probes",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository",
+            "tag"
+          ],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "replicaCount": {
+          "$ref": "#/definitions/replicaCount"
+        },
+        "containerPort": {
+          "$ref": "#/definitions/port"
+        },
+        "service": {
+          "$ref": "#/definitions/service"
+        },
+        "probes": {
+          "$ref": "#/definitions/periodicProbes"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    },
+
+    "cartService": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "image",
+        "replicaCount",
+        "containerPort",
+        "service",
+        "dependencies",
+        "probes",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "$ref": "#/definitions/applicationImage"
+        },
+        "replicaCount": {
+          "$ref": "#/definitions/replicaCount"
+        },
+        "containerPort": {
+          "$ref": "#/definitions/port"
+        },
+        "service": {
+          "$ref": "#/definitions/service"
+        },
+        "dependencies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "redis"
+          ],
+          "properties": {
+            "redis": {
+              "$ref": "#/definitions/serviceAddress"
+            }
+          }
+        },
+        "probes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "readiness",
+            "liveness"
+          ],
+          "properties": {
+            "readiness": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "initialDelaySeconds"
+              ],
+              "properties": {
+                "initialDelaySeconds": {
+                  "$ref": "#/definitions/nonNegativeInteger"
+                }
+              }
+            },
+            "liveness": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "initialDelaySeconds",
+                "periodSeconds"
+              ],
+              "properties": {
+                "initialDelaySeconds": {
+                  "$ref": "#/definitions/nonNegativeInteger"
+                },
+                "periodSeconds": {
+                  "$ref": "#/definitions/positiveInteger"
+                }
+              }
+            }
+          }
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    },
+
+    "shippingService": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "image",
+        "replicaCount",
+        "containerPort",
+        "service",
+        "probes",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "$ref": "#/definitions/applicationImage"
+        },
+        "replicaCount": {
+          "$ref": "#/definitions/replicaCount"
+        },
+        "containerPort": {
+          "$ref": "#/definitions/port"
+        },
+        "service": {
+          "$ref": "#/definitions/service"
+        },
+        "probes": {
+          "$ref": "#/definitions/periodicProbes"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    },
+
+    "paymentService": {
+      "$ref": "#/definitions/basicApplicationService"
+    },
+
+    "emailService": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "image",
+        "replicaCount",
+        "containerPort",
+        "service",
+        "probes",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "$ref": "#/definitions/applicationImage"
+        },
+        "replicaCount": {
+          "$ref": "#/definitions/replicaCount"
+        },
+        "containerPort": {
+          "$ref": "#/definitions/port"
+        },
+        "service": {
+          "$ref": "#/definitions/service"
+        },
+        "probes": {
+          "$ref": "#/definitions/periodicProbes"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    },
+
+    "checkoutService": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "image",
+        "replicaCount",
+        "containerPort",
+        "service",
+        "dependencies",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "$ref": "#/definitions/applicationImage"
+        },
+        "replicaCount": {
+          "$ref": "#/definitions/replicaCount"
+        },
+        "containerPort": {
+          "$ref": "#/definitions/port"
+        },
+        "service": {
+          "$ref": "#/definitions/service"
+        },
+        "dependencies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "productCatalogService",
+            "shippingService",
+            "paymentService",
+            "emailService",
+            "currencyService",
+            "cartService"
+          ],
+          "properties": {
+            "productCatalogService": {
+              "$ref": "#/definitions/serviceAddress"
+            },
+            "shippingService": {
+              "$ref": "#/definitions/serviceAddress"
+            },
+            "paymentService": {
+              "$ref": "#/definitions/serviceAddress"
+            },
+            "emailService": {
+              "$ref": "#/definitions/serviceAddress"
+            },
+            "currencyService": {
+              "$ref": "#/definitions/serviceAddress"
+            },
+            "cartService": {
+              "$ref": "#/definitions/serviceAddress"
+            }
+          }
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    }
+  },
+
+  "definitions": {
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    },
+
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+
+    "serviceAddress": {
+      "type": "string",
+      "minLength": 3,
+      "pattern": "^[A-Za-z0-9.-]+:[0-9]+$"
+    },
+
+    "applicationImage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "port",
+        "targetPort"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ClusterIP",
+            "NodePort",
+            "LoadBalancer"
+          ]
+        },
+        "port": {
+          "$ref": "#/definitions/port"
+        },
+        "targetPort": {
+          "$ref": "#/definitions/port"
+        }
+      }
+    },
+
+    "resourceValues": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cpu",
+        "memory"
+      ],
+      "properties": {
+        "cpu": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memory": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requests",
+        "limits"
+      ],
+      "properties": {
+        "requests": {
+          "$ref": "#/definitions/resourceValues"
+        },
+        "limits": {
+          "$ref": "#/definitions/resourceValues"
+        }
+      }
+    },
+
+    "podSecurityContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fsGroup",
+        "runAsGroup",
+        "runAsNonRoot",
+        "runAsUser"
+      ],
+      "properties": {
+        "fsGroup": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "runAsGroup": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "runAsNonRoot": {
+          "type": "boolean",
+          "const": true
+        },
+        "runAsUser": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+
+    "containerSecurityContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowPrivilegeEscalation",
+        "privileged",
+        "readOnlyRootFilesystem",
+        "capabilities"
+      ],
+      "properties": {
+        "allowPrivilegeEscalation": {
+          "type": "boolean",
+          "const": false
+        },
+        "privileged": {
+          "type": "boolean",
+          "const": false
+        },
+        "readOnlyRootFilesystem": {
+          "type": "boolean",
+          "const": true
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "drop"
+          ],
+          "properties": {
+            "drop": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "contains": {
+                "const": "ALL"
+              },
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "delayedProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "initialDelaySeconds"
+      ],
+      "properties": {
+        "initialDelaySeconds": {
+          "$ref": "#/definitions/nonNegativeInteger"
+        }
+      }
+    },
+
+    "periodicProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "periodSeconds"
+      ],
+      "properties": {
+        "periodSeconds": {
+          "$ref": "#/definitions/positiveInteger"
+        }
+      }
+    },
+
+    "periodicProbes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "readiness",
+        "liveness"
+      ],
+      "properties": {
+        "readiness": {
+          "$ref": "#/definitions/periodicProbe"
+        },
+        "liveness": {
+          "$ref": "#/definitions/periodicProbe"
+        }
+      }
+    },
+
+    "timedProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "initialDelaySeconds",
+        "periodSeconds"
+      ],
+      "properties": {
+        "initialDelaySeconds": {
+          "$ref": "#/definitions/nonNegativeInteger"
+        },
+        "periodSeconds": {
+          "$ref": "#/definitions/positiveInteger"
+        }
+      }
+    },
+
+    "timedProbes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "readiness",
+        "liveness"
+      ],
+      "properties": {
+        "readiness": {
+          "$ref": "#/definitions/timedProbe"
+        },
+        "liveness": {
+          "$ref": "#/definitions/timedProbe"
+        }
+      }
+    },
+
+    "basicApplicationService": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "image",
+        "replicaCount",
+        "containerPort",
+        "service",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "$ref": "#/definitions/applicationImage"
+        },
+        "replicaCount": {
+          "$ref": "#/definitions/replicaCount"
+        },
+        "containerPort": {
+          "$ref": "#/definitions/port"
+        },
+        "service": {
+          "$ref": "#/definitions/service"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    }
+  }
+}

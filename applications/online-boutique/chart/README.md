@@ -20,6 +20,7 @@ Implemented workloads:
 - checkoutservice
 
 ### Diagram
+
 ```text
 Frontend
 └── Checkout Service
@@ -42,29 +43,6 @@ and order confirmation.
 
 The local Redis deployment uses ephemeral storage and is
 intended for development and integration testing.
-
-## Local Installation
-
-```bash
-helm upgrade \
-  --install online-boutique \
-  applications/online-boutique/chart \
-  --namespace online-boutique \
-  --create-namespace \
-  -f environments/local/online-boutique/values.yaml
-```
-## Validation
-
-```bash
-helm lint \
-  applications/online-boutique/chart \
-  --strict
-
-helm template \
-  online-boutique \
-  applications/online-boutique/chart \
-  --namespace online-boutique
-```
 
 ## Chart Conventions
 
@@ -139,3 +117,87 @@ the global image repository and tag.
 
 Third-party workloads, such as Redis, maintain their own image repository
 and version configuration.
+
+## Local Installation
+
+```bash
+helm upgrade \
+  --install online-boutique \
+  applications/online-boutique/chart \
+  --namespace online-boutique \
+  --create-namespace \
+  -f environments/local/online-boutique/values.yaml
+```
+
+## Values Validation
+
+The chart defines its configuration contract using
+`values.schema.json`.
+
+Helm automatically validates the final merged values before rendering or
+installing the chart.
+
+The schema validates, among other things:
+
+- required workload configuration
+- configuration value types
+- replica counts
+- container and Service port ranges
+- supported Kubernetes Service types
+- image pull policies
+- container image configuration
+- service dependency addresses
+- resource configuration structure
+- common Pod and container security settings
+
+Unknown configuration properties are rejected to help detect
+configuration typos early.
+
+For example, those invalid overrides:
+
+```bash
+helm template \
+  online-boutique \
+  applications/online-boutique/chart \
+  --set frontend.replicaCont=3
+```
+is rejected because `replicaCont` is not part of the chart configuration
+contract.
+
+```bash
+helm template \
+  online-boutique \
+  applications/online-boutique/chart \
+  --set global.containerSecurityContext.privileged=true \
+  > /dev/null
+```
+is rejected because schema set constant boolean value for `privileged` property as `false`.
+
+```json
+"privileged": {
+  "type": "boolean",
+  "const": false
+}
+```
+
+### Validate the chart
+
+```bash
+helm lint \
+  applications/online-boutique/chart \
+  --strict \
+  -f environments/local/online-boutique/values.yaml
+```
+
+Render locally:
+
+```bash
+helm template \
+  online-boutique \
+  applications/online-boutique/chart \
+  --namespace online-boutique \
+  -f environments/local/online-boutique/values.yaml
+```
+
+The same schema validation is also performed during `helm install` and
+`helm upgrade`.
