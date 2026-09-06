@@ -110,3 +110,68 @@ Synced / Healthy
 
 Automated synchronization, pruning and self-healing are introduced
 separately after the manual reconciliation workflow has been validated.
+
+## Automated Reconciliation
+
+The local Online Boutique Application uses automated GitOps
+reconciliation.
+
+Argo CD continuously compares the desired state stored in Git with the
+actual state running in Kubernetes.
+
+The Application enables:
+
+- automated synchronization
+- automatic pruning of resources removed from Git
+- automatic self-healing of cluster drift
+- namespace creation
+- pruning after successful resource synchronization
+
+The reconciliation model is:
+
+```text
+Git desired state
+      ↓
+Argo CD
+      ↓
+Compare
+      ↓
+OutOfSync
+      ↓
+Automatic Sync
+      ↓
+Kubernetes
+      ↓
+Synced / Healthy
+```
+
+Manual changes to Argo CD-managed application resources are considered
+configuration drift and may be automatically reverted.
+
+Application lifecycle changes should therefore be introduced through Git
+rather than through direct `kubectl apply`, `kubectl edit` or Helm CLI
+operations.
+
+### Resource Ownership
+
+Online Boutique workload lifecycle is owned by Argo CD.
+
+For managed application resources:
+
+Do not use:
+
+- `helm install`
+- `helm upgrade`
+- `kubectl apply`
+- `kubectl edit`
+
+Use Git changes and Argo CD reconciliation instead.
+
+`kubectl` remains appropriate for operational inspection and
+troubleshooting, including:
+
+- `kubectl get`
+- `kubectl describe`
+- `kubectl logs`
+- `kubectl exec`
+- `kubectl port-forward`
