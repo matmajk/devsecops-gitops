@@ -266,3 +266,23 @@ checkoutService:
     limits:
       cpu: 200m
       memory: 128Mi
+
+loadGenerator:
+  enabled: false
+  image:
+    name: loadgenerator
+  replicaCount: 1
+  frontendAddress: "frontend:80"
+  users: 10
+  rate: 1
+  initContainer:
+    image: "busybox:1.38.0@sha256:fd8d9aa63ba2f0982b5304e1ee8d3b90a210bc1ffb5314d980eb6962f1a9715d"
+    maxRetries: 12
+    retryIntervalSeconds: 10
+  resources:
+    requests:
+      cpu: 300m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

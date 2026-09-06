@@ -1,0 +1,85 @@
+{{- if .Values.loadGenerator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgenerator
+  labels:
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "loadgenerator"
+      "component" "load-testing"
+    ) | nindent 4 }}
+spec:
+  replicas: {{ .Values.loadGenerator.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: loadgenerator
+  template:
+    metadata:
+      labels:
+        {{- include "online-boutique.podLabels" (dict
+          "root" .
+          "name" "loadgenerator"
+          "component" "load-testing"
+        ) | nindent 8 }}
+    spec:
+      serviceAccountName: loadgenerator
+      terminationGracePeriodSeconds: 5
+      restartPolicy: Always
+      securityContext:
+        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
+
+      initContainers:
+        - name: frontend-check
+          image: {{ .Values.loadGenerator.initContainer.image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
+          command:
+            - /bin/sh
+            - -exc
+            - |
+              for i in $(seq 1 "${MAX_RETRIES}"); do
+                echo "Attempt ${i}: checking frontend at ${FRONTEND_ADDR}..."
+                STATUS_CODE=$(
+                  wget \
+                    --server-response \
+                    "http://${FRONTEND_ADDR}" \
+                    2>&1 \
+                  | awk '/^  HTTP/{print $2}'
+                )
+                if [ "${STATUS_CODE}" = "200" ]; then
+                  echo "Frontend is reachable."
+                  exit 0
+                fi
+                echo "Frontend is not ready. HTTP status: ${STATUS_CODE:-unknown}"
+                sleep "${RETRY_INTERVAL_SECONDS}"
+              done
+              echo "Frontend did not become reachable after ${MAX_RETRIES} attempts."
+              exit 1
+          env:
+            - name: FRONTEND_ADDR
+              value: {{ .Values.loadGenerator.frontendAddress | quote }}
+            - name: MAX_RETRIES
+              value: {{ .Values.loadGenerator.initContainer.maxRetries | quote }}
+            - name: RETRY_INTERVAL_SECONDS
+              value: {{ .Values.loadGenerator.initContainer.retryIntervalSeconds | quote }}
+      containers:
+        - name: loadgenerator
+          image: {{ include "online-boutique.appImage" (dict
+            "root" .
+            "name" .Values.loadGenerator.image.name
+          ) | quote }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          securityContext:
+            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
+          env:
+            - name: FRONTEND_ADDR
+              value: {{ .Values.loadGenerator.frontendAddress | quote }}
+            - name: USERS
+              value: {{ .Values.loadGenerator.users | quote }}
+            - name: RATE
+              value: {{ .Values.loadGenerator.rate | quote }}
+          resources:
+            {{- toYaml .Values.loadGenerator.resources | nindent 12 }}
+{{- end }}

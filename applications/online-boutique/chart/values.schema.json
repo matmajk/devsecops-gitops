@@ -16,7 +16,8 @@
     "shippingService",
     "paymentService",
     "emailService",
-    "checkoutService"
+    "checkoutService",
+    "loadGenerator"
   ],
   "properties": {
     "global": {
@@ -509,6 +510,69 @@
             },
             "cartService": {
               "$ref": "#/definitions/serviceAddress"
+            }
+          }
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    },
+
+    "loadGenerator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "image",
+        "replicaCount",
+        "frontendAddress",
+        "users",
+        "rate",
+        "initContainer",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "$ref": "#/definitions/applicationImage"
+        },
+        "replicaCount": {
+          "$ref": "#/definitions/replicaCount"
+        },
+        "frontendAddress": {
+          "$ref": "#/definitions/serviceAddress"
+        },
+        "users": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rate": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "initContainer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "image",
+            "maxRetries",
+            "retryIntervalSeconds"
+          ],
+          "properties": {
+            "image": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maxRetries": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "retryIntervalSeconds": {
+              "type": "integer",
+              "minimum": 1
             }
           }
         },
