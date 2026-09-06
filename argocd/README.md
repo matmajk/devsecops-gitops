@@ -68,3 +68,45 @@ The UI is then available at `https://localhost:8081`
 
 Application configuration is introduced separately and is managed using
 declarative `Application` and `AppProject` resources.
+
+## Online Boutique Application
+
+The local Online Boutique deployment is managed through a declarative
+Argo CD `Application`.
+
+The Application uses:
+
+- the `online-boutique` AppProject
+- the Online Boutique Helm chart stored in this repository
+- environment-specific values from `environments/local`
+- the local Kubernetes cluster as the deployment destination
+- the `online-boutique` namespace
+
+Argo CD uses Helm to render Kubernetes manifests while Argo CD manages
+the application lifecycle.
+
+The local Application initially uses manual synchronization so changes
+can be reviewed before they are applied to the cluster.
+
+## Deployment Workflow
+
+Changes to the application deployment configuration follow this flow:
+
+```text
+Git commit
+    ↓
+Git repository
+    ↓
+Argo CD comparison
+    ↓
+OutOfSync
+    ↓
+Manual Sync
+    ↓
+Kubernetes
+    ↓
+Synced / Healthy
+```
+
+Automated synchronization, pruning and self-healing are introduced
+separately after the manual reconciliation workflow has been validated.

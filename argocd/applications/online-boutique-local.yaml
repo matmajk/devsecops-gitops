@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: online-boutique-local
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: online-boutique
+  source:
+    repoURL: https://github.com/matmajk/devsecops-gitops.git
+    targetRevision: master
+    path: applications/online-boutique/chart
+    helm:
+      releaseName: online-boutique
+      valueFiles:
+        - ../../../environments/local/online-boutique/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: online-boutique
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
