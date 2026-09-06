@@ -18,6 +18,7 @@ Implemented workloads:
 - paymentservice
 - emailservice
 - checkoutservice
+- loadgenerator
 
 ### Diagram
 
@@ -117,6 +118,32 @@ the global image repository and tag.
 
 Third-party workloads, such as Redis, maintain their own image repository
 and version configuration.
+
+## Load Generation
+
+The chart can optionally deploy the Online Boutique Load Generator,
+which uses Locust to continuously generate realistic shopping traffic
+against the frontend.
+
+Load generation is disabled by default and can be enabled per environment.
+
+Example:
+
+```yaml
+loadGenerator:
+  enabled: true
+  users: 10
+  rate: 1
+```
+`users` defines the target number of simulated users, while `rate`
+defines how quickly new users are spawned.
+
+The workload uses an init container to verify frontend availability
+before starting traffic generation.
+
+The local environment enables the Load Generator to support integration
+testing, observability exercises, autoscaling experiments and failure
+testing.
 
 ## Local Installation
 
