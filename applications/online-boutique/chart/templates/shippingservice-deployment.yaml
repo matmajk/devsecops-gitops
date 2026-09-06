@@ -4,9 +4,11 @@ kind: Deployment
 metadata:
   name: shippingservice
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: shippingservice
-    app.kubernetes.io/component: shipping
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "shippingservice"
+      "component" "shipping"
+    ) | nindent 4 }}
 spec:
   replicas: {{ .Values.shippingService.replicaCount }}
   selector:
@@ -15,27 +17,24 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: shippingservice
-        app.kubernetes.io/component: shipping
-        app.kubernetes.io/part-of: online-boutique
+        {{- include "online-boutique.podLabels" (dict
+          "root" .
+          "name" "shippingservice"
+          "component" "shipping"
+        ) | nindent 8 }}
     spec:
       serviceAccountName: shippingservice
       securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
+        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
       containers:
         - name: shippingservice
-          image: "{{ .Values.global.imageRepository }}/{{ .Values.shippingService.image.name }}:{{ .Values.global.imageTag }}"
+          image: {{ include "online-boutique.appImage" (dict
+            "root" .
+            "name" .Values.shippingService.image.name
+          ) | quote }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           securityContext:
-            allowPrivilegeEscalation: false
-            privileged: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
+            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
           ports:
             - name: grpc
               containerPort: {{ .Values.shippingService.containerPort }}

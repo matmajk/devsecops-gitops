@@ -4,9 +4,11 @@ kind: Service
 metadata:
   name: currencyservice
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: currencyservice
-    app.kubernetes.io/component: catalog
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "currencyservice"
+      "component" "catalog"
+    ) | nindent 4 }}
 spec:
   type: {{ .Values.currencyService.service.type }}
   selector:

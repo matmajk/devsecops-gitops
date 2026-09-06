@@ -4,9 +4,11 @@ kind: Service
 metadata:
   name: checkoutservice
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: checkoutservice
-    app.kubernetes.io/component: checkout
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "checkoutservice"
+      "component" "checkout"
+    ) | nindent 4 }}
 spec:
   type: {{ .Values.checkoutService.service.type }}
   selector:

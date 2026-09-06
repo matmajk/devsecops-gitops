@@ -4,9 +4,11 @@ kind: Service
 metadata:
   name: redis-cart
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: redis-cart
-    app.kubernetes.io/component: cart-database
+    {{- include "online-boutique.componentLabels" (dict 
+      "root" . 
+      "name" "redis-cart" 
+      "component" "cart-database"
+    ) | nindent 4 }}
 spec:
   type: {{ .Values.redisCart.service.type }}
   selector:

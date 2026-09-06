@@ -4,9 +4,11 @@ kind: Deployment
 metadata:
   name: cartservice
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: cartservice
-    app.kubernetes.io/component: cart
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "cartservice"
+      "component" "cart"
+    ) | nindent 4 }}
 spec:
   replicas: {{ .Values.cartService.replicaCount }}
   selector:
@@ -15,28 +17,25 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: cartservice
-        app.kubernetes.io/component: cart
-        app.kubernetes.io/part-of: online-boutique
+        {{- include "online-boutique.podLabels" (dict
+          "root" .
+          "name" "cartservice"
+          "component" "cart"
+        ) | nindent 8 }}
     spec:
       serviceAccountName: cartservice
       terminationGracePeriodSeconds: 5
       securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
+        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
       containers:
         - name: cartservice
-          image: "{{ .Values.global.imageRepository }}/{{ .Values.cartService.image.name }}:{{ .Values.global.imageTag }}"
+          image: {{ include "online-boutique.appImage" (dict
+            "root" .
+            "name" .Values.cartService.image.name
+          ) | quote }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           securityContext:
-            allowPrivilegeEscalation: false
-            privileged: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
+            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
           ports:
             - name: grpc
               containerPort: {{ .Values.cartService.containerPort }}

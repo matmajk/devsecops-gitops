@@ -4,9 +4,11 @@ kind: Deployment
 metadata:
   name: paymentservice
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: paymentservice
-    app.kubernetes.io/component: payment
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "paymentservice"
+      "component" "payment"
+    ) | nindent 4 }}
 spec:
   replicas: {{ .Values.paymentService.replicaCount }}
   selector:
@@ -15,28 +17,25 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: paymentservice
-        app.kubernetes.io/component: payment
-        app.kubernetes.io/part-of: online-boutique
+        {{- include "online-boutique.podLabels" (dict
+          "root" .
+          "name" "paymentservice"
+          "component" "payment"
+        ) | nindent 8 }}
     spec:
       serviceAccountName: paymentservice
       terminationGracePeriodSeconds: 5
       securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
+        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
       containers:
         - name: paymentservice
-          image: "{{ .Values.global.imageRepository }}/{{ .Values.paymentService.image.name }}:{{ .Values.global.imageTag }}"
+          image: {{ include "online-boutique.appImage" (dict
+            "root" .
+            "name" .Values.paymentService.image.name
+          ) | quote }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           securityContext:
-            allowPrivilegeEscalation: false
-            privileged: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
+            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
           ports:
             - name: grpc
               containerPort: {{ .Values.paymentService.containerPort }}
