@@ -4,9 +4,11 @@ kind: Service
 metadata:
   name: cartservice
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: cartservice
-    app.kubernetes.io/component: cart
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "cartservice"
+      "component" "cart"
+    ) | nindent 4 }}
 spec:
   type: {{ .Values.cartService.service.type }}
   selector:

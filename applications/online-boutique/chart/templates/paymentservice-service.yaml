@@ -4,9 +4,11 @@ kind: Service
 metadata:
   name: paymentservice
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: paymentservice
-    app.kubernetes.io/component: payment
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "paymentservice"
+      "component" "payment"
+    ) | nindent 4 }}
 spec:
   type: {{ .Values.paymentService.service.type }}
   selector:

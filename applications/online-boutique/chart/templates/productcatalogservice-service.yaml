@@ -4,9 +4,11 @@ kind: Service
 metadata:
   name: productcatalogservice
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: productcatalogservice
-    app.kubernetes.io/component: catalog
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "productcatalogservice"
+      "component" "catalog"
+    ) | nindent 4 }}
 spec:
   type: {{ .Values.productCatalogService.service.type }}
   selector:

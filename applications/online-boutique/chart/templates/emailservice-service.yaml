@@ -4,9 +4,11 @@ kind: Service
 metadata:
   name: emailservice
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: emailservice
-    app.kubernetes.io/component: email
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "emailservice"
+      "component" "email"
+    ) | nindent 4 }}
 spec:
   type: {{ .Values.emailService.service.type }}
   selector:

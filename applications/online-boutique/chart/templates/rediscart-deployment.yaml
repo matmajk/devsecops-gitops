@@ -4,9 +4,11 @@ kind: Deployment
 metadata:
   name: redis-cart
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: redis-cart
-    app.kubernetes.io/component: cart-database
+    {{- include "online-boutique.componentLabels" (dict 
+      "root" . 
+      "name" "redis-cart" 
+      "component" "cart-database"
+    ) | nindent 4 }}
 spec:
   replicas: {{ .Values.redisCart.replicaCount }}
   selector:
@@ -15,27 +17,21 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: redis-cart
-        app.kubernetes.io/component: cart-database
-        app.kubernetes.io/part-of: online-boutique
+        {{- include "online-boutique.podLabels" (dict
+          "root" .
+          "name" "redis-cart"
+          "component" "cart-database"
+        ) | nindent 8 }}
     spec:
       automountServiceAccountToken: false
       securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
+        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
       containers:
         - name: redis
           image: "{{ .Values.redisCart.image.repository }}:{{ .Values.redisCart.image.tag }}"
           imagePullPolicy: IfNotPresent
           securityContext:
-            allowPrivilegeEscalation: false
-            privileged: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
+            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
           ports:
             - name: redis
               containerPort: {{ .Values.redisCart.containerPort }}

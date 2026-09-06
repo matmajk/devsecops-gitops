@@ -4,9 +4,11 @@ kind: Service
 metadata:
   name: shippingservice
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: shippingservice
-    app.kubernetes.io/component: shipping
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "shippingservice"
+      "component" "shipping"
+    ) | nindent 4 }}
 spec:
   type: {{ .Values.shippingService.service.type }}
   selector:

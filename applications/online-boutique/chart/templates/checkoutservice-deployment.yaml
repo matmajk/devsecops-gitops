@@ -4,9 +4,11 @@ kind: Deployment
 metadata:
   name: checkoutservice
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: checkoutservice
-    app.kubernetes.io/component: checkout
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "checkoutservice"
+      "component" "checkout"
+    ) | nindent 4 }}
 spec:
   replicas: {{ .Values.checkoutService.replicaCount }}
   selector:
@@ -15,27 +17,24 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: checkoutservice
-        app.kubernetes.io/component: checkout
-        app.kubernetes.io/part-of: online-boutique
+        {{- include "online-boutique.podLabels" (dict
+          "root" .
+          "name" "checkoutservice"
+          "component" "checkout"
+        ) | nindent 8 }}
     spec:
       serviceAccountName: checkoutservice
       securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
+        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
       containers:
         - name: checkoutservice
-          image: "{{ .Values.global.imageRepository }}/{{ .Values.checkoutService.image.name }}:{{ .Values.global.imageTag }}"
+          image: {{ include "online-boutique.appImage" (dict
+            "root" .
+            "name" .Values.checkoutService.image.name
+          ) | quote }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           securityContext:
-            allowPrivilegeEscalation: false
-            privileged: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
+            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
           ports:
             - name: grpc
               containerPort: {{ .Values.checkoutService.containerPort }}

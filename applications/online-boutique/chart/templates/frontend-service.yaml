@@ -4,9 +4,11 @@ kind: Service
 metadata:
   name: frontend
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: frontend
-    app.kubernetes.io/component: frontend
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "frontend"
+      "component" "frontend"
+    ) | nindent 4 }}
 spec:
   type: {{ .Values.frontend.service.type }}
   selector:

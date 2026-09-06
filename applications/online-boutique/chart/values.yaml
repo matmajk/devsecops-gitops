@@ -2,6 +2,18 @@ global:
   imageRepository: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo
   imageTag: 'v0.10.6'
   imagePullPolicy: IfNotPresent
+  podSecurityContext:
+    fsGroup: 1000
+    runAsGroup: 1000
+    runAsNonRoot: true
+    runAsUser: 1000
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    privileged: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
 
 frontend:
   enabled: true

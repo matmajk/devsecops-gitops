@@ -4,9 +4,11 @@ kind: Deployment
 metadata:
   name: recommendationservice
   labels:
-    {{- include "online-boutique.labels" . | nindent 4 }}
-    app.kubernetes.io/name: recommendationservice
-    app.kubernetes.io/component: catalog
+    {{- include "online-boutique.componentLabels" (dict
+      "root" .
+      "name" "recommendationservice"
+      "component" "catalog"
+    ) | nindent 4 }}
 spec:
   replicas: {{ .Values.recommendationService.replicaCount }}
   selector:
@@ -15,28 +17,25 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: recommendationservice
-        app.kubernetes.io/component: catalog
-        app.kubernetes.io/part-of: online-boutique
+        {{- include "online-boutique.podLabels" (dict
+          "root" .
+          "name" "recommendationservice"
+          "component" "catalog"
+        ) | nindent 8 }}
     spec:
       serviceAccountName: recommendationservice
       terminationGracePeriodSeconds: 5
       securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
+        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
       containers:
         - name: recommendationservice
-          image: "{{ .Values.global.imageRepository }}/{{ .Values.recommendationService.image.name }}:{{ .Values.global.imageTag }}"
+          image: {{ include "online-boutique.appImage" (dict
+            "root" .
+            "name" .Values.recommendationService.image.name
+          ) | quote }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           securityContext:
-            allowPrivilegeEscalation: false
-            privileged: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
+            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
           ports:
             - name: grpc
               containerPort: {{ .Values.recommendationService.containerPort }}
