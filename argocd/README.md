@@ -175,3 +175,20 @@ troubleshooting, including:
 - `kubectl logs`
 - `kubectl exec`
 - `kubectl port-forward`
+
+## GitOps Hierarchy
+
+```text
+platform-root
+├── online-boutique AppProject
+└── online-boutique-local Application
+    └── Online Boutique Helm workloads
+```
+
+### Explanation:
+
+The root Application is the bootstrap boundary of the GitOps model.
+After Argo CD is installed, the root Application reconciles Argo CD
+projects and child Applications directly from Git.
+
+Child Applications then reconcile application workloads.
