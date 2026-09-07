@@ -48,6 +48,9 @@ nodeExporter:
 
 # Control-plane components in Kind are not exposed in the same way
 # as in a typical managed Kubernetes cluster.
+coreDns:
+  enabled: false
+  
 kubeControllerManager:
   enabled: false
 
