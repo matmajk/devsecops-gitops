@@ -14,31 +14,31 @@ grafana:
       memory: 128Mi
     limits:
       cpu: 300m
-      memory: 256Mi
+      memory: 384Mi
 
 prometheus:
   enabled: true
   service:
     type: ClusterIP
   prometheusSpec:
-    retention: 6h
+    retention: 3h
     resources:
       requests:
-        cpu: 200m
-        memory: 512Mi
+        cpu: 150m
+        memory: 256Mi
       limits:
-        cpu: 500m
-        memory: 1Gi
+        cpu: 400m
+        memory: 768Mi
 
 prometheusOperator:
   enabled: true
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 50m
+      memory: 64Mi
     limits:
-      cpu: 200m
-      memory: 256Mi
+      cpu: 150m
+      memory: 192Mi
 
 kubeStateMetrics:
   enabled: true
@@ -50,7 +50,7 @@ nodeExporter:
 # as in a typical managed Kubernetes cluster.
 coreDns:
   enabled: false
-  
+
 kubeControllerManager:
   enabled: false
 
