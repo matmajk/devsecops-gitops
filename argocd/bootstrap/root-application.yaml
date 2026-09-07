@@ -13,9 +13,7 @@ spec:
         recurse: true
     - repoURL: https://github.com/matmajk/devsecops-gitops.git
       targetRevision: master
-      path: argocd/applications
-      directory:
-        recurse: true
+      path: argocd
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
