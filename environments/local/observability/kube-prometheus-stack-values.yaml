@@ -23,6 +23,13 @@ grafana:
       url: http://loki.monitoring.svc.cluster.local:3100
       isDefault: false
       editable: false
+    - name: Jaeger
+      uid: jaeger
+      type: jaeger
+      access: proxy
+      url: http://jaeger.monitoring.svc.cluster.local:16686
+      isDefault: false
+      editable: false
 
 prometheus:
   enabled: true

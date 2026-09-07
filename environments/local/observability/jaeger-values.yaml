@@ -1,0 +1,27 @@
+jaeger:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 384Mi
+  ingress:
+    enabled: false
+  httproute:
+    enabled: false
+  oAuthSidecar:
+    enabled: false
+
+spark:
+  enabled: false
+
+esIndexCleaner:
+  enabled: false
+
+esRollover:
+  enabled: false
+
+esLookback:
+  enabled: false
