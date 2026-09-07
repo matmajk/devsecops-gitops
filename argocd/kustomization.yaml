@@ -5,3 +5,5 @@ resources:
   - applications/observability-metrics-local.yaml
 #  - applications/observability-loki-local.yaml
 #  - applications/observability-alloy-local.yaml
+  - applications/observability-opentelemetry-local.yaml 
+  - applications/observability-jaeger-local.yaml
