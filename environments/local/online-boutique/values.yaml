@@ -2,6 +2,6 @@ frontend:
   replicaCount: 1
 
 loadGenerator:
-  enabled: false
+  enabled: true
   users: 12
   rate: 1
