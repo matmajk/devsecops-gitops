@@ -54,6 +54,7 @@ spec:
               value: {{ .Values.checkoutService.dependencies.currencyService | quote }}
             - name: CART_SERVICE_ADDR
               value: {{ .Values.checkoutService.dependencies.cartService | quote }}
+            {{- include "online-boutique.tracingEnv" (dict "root" . "serviceName" "checkoutservice") | nindent 12 }}
           readinessProbe:
             grpc:
               port: {{ .Values.checkoutService.containerPort }}

@@ -45,6 +45,7 @@ spec:
               value: {{ .Values.currencyService.containerPort | quote }}
             - name: DISABLE_PROFILER
               value: "1"
+            {{- include "online-boutique.tracingEnv" (dict "root" . "serviceName" "currencyservice") | nindent 12 }}
           readinessProbe:
             grpc:
               port: {{ .Values.currencyService.containerPort }}

@@ -46,3 +46,21 @@ Container image for Online Boutique application services.
 {{- define "online-boutique.appImage" -}}
 {{- printf "%s/%s:%s" .root.Values.global.imageRepository .name .root.Values.global.imageTag -}}
 {{- end }}
+
+{{/*
+Render OpenTelemetry tracing environment variables.
+
+Expected context:
+    root:        Helm root context
+    serviceName: OpenTelemetry service name
+*/}}
+{{- define "online-boutique.tracingEnv" -}}
+{{- if .root.Values.global.tracing.enabled }}
+- name: ENABLE_TRACING
+  value: "1"
+- name: COLLECTOR_SERVICE_ADDR
+  value: {{ .root.Values.global.tracing.collectorServiceAddress | quote }}
+- name: OTEL_SERVICE_NAME
+  value: {{ .serviceName | quote }}
+{{- end }}
+{{- end }}

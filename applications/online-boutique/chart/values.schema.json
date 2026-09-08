@@ -28,7 +28,8 @@
         "imageTag",
         "imagePullPolicy",
         "podSecurityContext",
-        "containerSecurityContext"
+        "containerSecurityContext",
+        "tracing"
       ],
       "properties": {
         "imageRepository": {
@@ -52,6 +53,23 @@
         },
         "containerSecurityContext": {
           "$ref": "#/definitions/containerSecurityContext"
+        },
+        "tracing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "collectorServiceAddress"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "collectorServiceAddress": {
+              "type"  : "string",
+              "minLength": 1
+            }
+          }
         }
       }
     },

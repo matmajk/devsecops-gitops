@@ -14,6 +14,9 @@ global:
     capabilities:
       drop:
         - ALL
+  tracing:
+    enabled: true
+    collectorServiceAddress: "opentelemetry-collector.monitoring.svc.cluster.local:4317"
 
 frontend:
   enabled: true

@@ -60,6 +60,7 @@ spec:
               value: {{ .Values.frontend.dependencies.shoppingAssistantService | quote }}
             - name: ENABLE_PROFILER
               value: "0"
+            {{- include "online-boutique.tracingEnv" (dict "root" . "serviceName" "frontend") | nindent 12 }}
           readinessProbe:
             initialDelaySeconds: {{ .Values.frontend.probes.readiness.initialDelaySeconds }}
             httpGet:

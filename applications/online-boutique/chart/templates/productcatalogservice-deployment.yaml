@@ -45,6 +45,7 @@ spec:
               value: {{ .Values.productCatalogService.containerPort | quote }}
             - name: DISABLE_PROFILER
               value: "1"
+            {{- include "online-boutique.tracingEnv" (dict "root" . "serviceName" "productcatalogservice") | nindent 12 }}
           readinessProbe:
             grpc:
               port: {{ .Values.productCatalogService.containerPort }}

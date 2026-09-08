@@ -47,6 +47,7 @@ spec:
               value: {{ .Values.recommendationService.dependencies.productCatalogService | quote }}
             - name: DISABLE_PROFILER
               value: "1"
+            {{- include "online-boutique.tracingEnv" (dict "root" . "serviceName" "recommendationservice") | nindent 12 }}
           readinessProbe:
             periodSeconds: 5
             grpc:
