@@ -145,6 +145,39 @@ The local environment enables the Load Generator to support integration
 testing, observability exercises, autoscaling experiments and failure
 testing.
 
+## Distributed Tracing
+
+The chart supports optional OpenTelemetry distributed tracing for Online Boutique services that provide tracing instrumentation in the upstream application.
+
+Tracing is disabled by default and can be enabled through environment-specific values:
+
+```yaml
+global:
+  tracing:
+    enabled: true
+    collectorServiceAddress: "opentelemetry-collector.monitoring.svc.cluster.local:4317"
+```
+
+When tracing is enabled, supported workloads receive the following environment variables:
+- ENABLE_TRACING=1
+- COLLECTOR_SERVICE_ADDR
+- OTEL_SERVICE_NAME
+
+The common tracing environment configuration is rendered through a shared Helm helper to avoid duplicating tracing configuration across workload templates.
+
+Tracing is enabled only for services that support it in the application baseline used by this chart:
+- frontend
+- checkoutservice
+- currencyservice
+- emailservice
+- paymentservice
+- productcatalogservice
+- recommendationservice
+
+Services without upstream tracing support are intentionally left unchanged.
+
+The default chart configuration keeps tracing disabled so the chart does not require an OpenTelemetry backend unless the selected environment explicitly enables it.
+
 ## Local Installation
 
 ```bash
