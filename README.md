@@ -271,9 +271,15 @@ The workflow does not:
 
 Those concerns belong to CI or Argo CD.
 
-The initial implementation uses manual `workflow_dispatch` execution.
+Artifact promotion can be initiated either manually or automatically.
 
-Automatic triggering from application CI is introduced separately after the promotion workflow has been validated.
+Manual promotions use `workflow_dispatch` and are useful for controlled
+re-promotion of existing artifacts.
+
+Validated artifacts can also be submitted through the `artifact-published`
+repository dispatch event.
+
+Both entry points use the same promotion engine and promotion catalog.
 
 ## Argo CD
 
