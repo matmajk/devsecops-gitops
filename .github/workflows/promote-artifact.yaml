@@ -15,12 +15,16 @@ on:
         required: true
         type: string
 
+  repository_dispatch:
+    types:
+      - artifact-published
+
 permissions:
   contents: write
   pull-requests: write
 
 concurrency:
-  group: promotion-${{ inputs.service }}-${{ inputs.environment }}
+  group: promotion-${{ inputs.service || github.event.client_payload.service }}-${{ inputs.environment || github.event.client_payload.environment }}
   cancel-in-progress: false
 
 env:
@@ -30,6 +34,12 @@ jobs:
   promote:
     name: Promote Artifact
     runs-on: ubuntu-latest
+
+    env:
+      SERVICE: ${{ inputs.service || github.event.client_payload.service }}
+      ENVIRONMENT: ${{ inputs.environment || github.event.client_payload.environment }}
+      IMAGE_TAG: ${{ inputs.image_tag || github.event.client_payload.image_tag }}
+      SOURCE_SHA: ${{ github.event.client_payload.source_sha || '' }}
 
     steps:
       - name: Checkout GitOps repository
@@ -50,10 +60,6 @@ jobs:
 
       - name: Validate promotion request
         shell: bash
-        env:
-          SERVICE: ${{ inputs.service }}
-          ENVIRONMENT: ${{ inputs.environment }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
           set -euo pipefail
 
@@ -69,19 +75,32 @@ jobs:
               exit 1
             }
 
-          [[ "${IMAGE_TAG}" =~ ^ci-[0-9a-f]{40}$ ]] \
-            || {
-              echo "Invalid image tag: ${IMAGE_TAG}" >&2
-              echo "Expected format: ci-<40-character git SHA>" >&2
-              exit 1
-            }
+          if [[ "${GITHUB_EVENT_NAME}" == "repository_dispatch" ]]; then
+            [[ "${SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]] \
+              || {
+                echo "Invalid source SHA: ${SOURCE_SHA}" >&2
+                exit 1
+              }
+
+            [[ "${IMAGE_TAG}" == "ci-${SOURCE_SHA}" ]] \
+              || {
+                echo "Image tag does not match source SHA." >&2
+                echo "Tag: ${IMAGE_TAG}" >&2
+                echo "SHA: ${SOURCE_SHA}" >&2
+                exit 1
+              }
+          else
+            [[ "${IMAGE_TAG}" =~ ^ci-[0-9a-f]{40}$ ]] \
+              || {
+                echo "Invalid image tag: ${IMAGE_TAG}" >&2
+                echo "Expected format: ci-<40-character git SHA>" >&2
+                exit 1
+              }
+          fi
 
       - name: Resolve promotion target
         id: target
         shell: bash
-        env:
-          SERVICE: ${{ inputs.service }}
-          ENVIRONMENT: ${{ inputs.environment }}
         run: |
           set -euo pipefail
 
@@ -172,7 +191,6 @@ jobs:
         env:
           VALUES_KEY: ${{ steps.target.outputs.values_key }}
           VALUES_FILE: ${{ steps.target.outputs.values_file }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
           set -euo pipefail
 
@@ -199,7 +217,6 @@ jobs:
         env:
           VALUES_KEY: ${{ steps.target.outputs.values_key }}
           VALUES_FILE: ${{ steps.target.outputs.values_file }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
           set -euo pipefail
 
@@ -208,6 +225,14 @@ jobs:
             yq -i \
             '.[strenv(VALUES_KEY)].image.tag = strenv(IMAGE_TAG)' \
             "${VALUES_FILE}"
+
+          CHANGED_FILES="$(git diff --name-only)"
+          [[ "${CHANGED_FILES}" == "${VALUES_FILE}" ]] \
+            || {
+              echo "Promotion modified unexpected files:" >&2
+              echo "${CHANGED_FILES}" >&2
+              exit 1
+            }
 
       - name: Validate Helm configuration
         if: steps.state.outputs.changed == 'true'
@@ -237,7 +262,6 @@ jobs:
         env:
           WORKLOAD_NAME: ${{ steps.target.outputs.workload_name }}
           CONTAINER_NAME: ${{ steps.target.outputs.container_name }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
           set -euo pipefail
 
@@ -297,10 +321,6 @@ jobs:
         if: steps.state.outputs.changed == 'true'
         id: branch
         shell: bash
-        env:
-          SERVICE: ${{ inputs.service }}
-          ENVIRONMENT: ${{ inputs.environment }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
           set -euo pipefail
 
@@ -317,9 +337,6 @@ jobs:
         if: steps.state.outputs.changed == 'true'
         shell: bash
         env:
-          SERVICE: ${{ inputs.service }}
-          ENVIRONMENT: ${{ inputs.environment }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
           VALUES_FILE: ${{ steps.target.outputs.values_file }}
         run: |
           set -euo pipefail
@@ -351,9 +368,6 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          SERVICE: ${{ inputs.service }}
-          ENVIRONMENT: ${{ inputs.environment }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
           PROMOTION_BRANCH: ${{ steps.branch.outputs.name }}
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
