@@ -5,3 +5,11 @@ loadGenerator:
   enabled: false
   users: 12
   rate: 1
+
+productCatalogService:
+  replicaCount: 1
+  image:
+    repository: "host.docker.internal:8082/online-boutique-docker-local"
+    tag: "ci-878f49e73f60fdcf334c841aa4b748259aef7b08"
+  imagePullSecrets:
+    - name: jfrog-registry
