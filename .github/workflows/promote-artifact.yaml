@@ -1,0 +1,379 @@
+name: Promote Artifact
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to promote"
+        required: true
+        type: string
+      environment:
+        description: "Target environment"
+        required: true
+        type: string
+      image_tag:
+        description: "Immutable image tag, for example ci-<git-sha>"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: promotion-${{ inputs.service }}-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  PROMOTION_CATALOG: .github/promotion/catalog.yaml
+
+jobs:
+  promote:
+    name: Promote Artifact
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify promotion tools
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          yq --version
+          helm version --short
+          gh --version
+
+      - name: Validate promotion request
+        shell: bash
+        env:
+          SERVICE: ${{ inputs.service }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          [[ "${SERVICE}" =~ ^[a-z0-9-]+$ ]] \
+            || {
+              echo "Invalid service identifier: ${SERVICE}" >&2
+              exit 1
+            }
+
+          [[ "${ENVIRONMENT}" =~ ^[a-z0-9-]+$ ]] \
+            || {
+              echo "Invalid environment identifier: ${ENVIRONMENT}" >&2
+              exit 1
+            }
+
+          [[ "${IMAGE_TAG}" =~ ^ci-[0-9a-f]{40}$ ]] \
+            || {
+              echo "Invalid image tag: ${IMAGE_TAG}" >&2
+              echo "Expected format: ci-<40-character git SHA>" >&2
+              exit 1
+            }
+
+      - name: Resolve promotion target
+        id: target
+        shell: bash
+        env:
+          SERVICE: ${{ inputs.service }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+
+          VALUES_KEY="$(
+            SERVICE="${SERVICE}" \
+              yq -r \
+              '.services[strenv(SERVICE)].valuesKey // ""' \
+              "${PROMOTION_CATALOG}"
+          )"
+
+          WORKLOAD_NAME="$(
+            SERVICE="${SERVICE}" \
+              yq -r \
+              '.services[strenv(SERVICE)].workloadName // ""' \
+              "${PROMOTION_CATALOG}"
+          )"
+
+          CONTAINER_NAME="$(
+            SERVICE="${SERVICE}" \
+              yq -r \
+              '.services[strenv(SERVICE)].containerName // ""' \
+              "${PROMOTION_CATALOG}"
+          )"
+
+          VALUES_FILE="$(
+            ENVIRONMENT="${ENVIRONMENT}" \
+              yq -r \
+              '.environments[strenv(ENVIRONMENT)].valuesFile // ""' \
+              "${PROMOTION_CATALOG}"
+          )"
+
+          CHART_PATH="$(
+            ENVIRONMENT="${ENVIRONMENT}" \
+              yq -r \
+              '.environments[strenv(ENVIRONMENT)].chartPath // ""' \
+              "${PROMOTION_CATALOG}"
+          )"
+
+          NAMESPACE="$(
+            ENVIRONMENT="${ENVIRONMENT}" \
+              yq -r \
+              '.environments[strenv(ENVIRONMENT)].namespace // ""' \
+              "${PROMOTION_CATALOG}"
+          )"
+
+          [[ -n "${VALUES_KEY}" ]] \
+            || {
+              echo "Service '${SERVICE}' is not registered for promotion." >&2
+              exit 1
+            }
+
+          [[ -n "${WORKLOAD_NAME}" && -n "${CONTAINER_NAME}" ]] \
+            || {
+              echo "Incomplete service configuration for '${SERVICE}'." >&2
+              exit 1
+            }
+
+          [[ -n "${VALUES_FILE}" && -n "${CHART_PATH}" && -n "${NAMESPACE}" ]] \
+            || {
+              echo "Environment '${ENVIRONMENT}' is not registered for promotion." >&2
+              exit 1
+            }
+
+          [[ -f "${VALUES_FILE}" ]] \
+            || {
+              echo "Values file does not exist: ${VALUES_FILE}" >&2
+              exit 1
+            }
+
+          [[ -d "${CHART_PATH}" ]] \
+            || {
+              echo "Chart path does not exist: ${CHART_PATH}" >&2
+              exit 1
+            }
+
+          {
+            echo "values_key=${VALUES_KEY}"
+            echo "workload_name=${WORKLOAD_NAME}"
+            echo "container_name=${CONTAINER_NAME}"
+            echo "values_file=${VALUES_FILE}"
+            echo "chart_path=${CHART_PATH}"
+            echo "namespace=${NAMESPACE}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Read current image tag
+        id: state
+        shell: bash
+        env:
+          VALUES_KEY: ${{ steps.target.outputs.values_key }}
+          VALUES_FILE: ${{ steps.target.outputs.values_file }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          CURRENT_TAG="$(
+            VALUES_KEY="${VALUES_KEY}" \
+              yq -r \
+              '.[strenv(VALUES_KEY)].image.tag // ""' \
+              "${VALUES_FILE}"
+          )"
+
+          echo "Current image tag: ${CURRENT_TAG}"
+          echo "Target image tag:  ${IMAGE_TAG}"
+
+          if [[ "${CURRENT_TAG}" == "${IMAGE_TAG}" ]]; then
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+            echo "Artifact is already the desired version."
+          else
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Update desired image tag
+        if: steps.state.outputs.changed == 'true'
+        shell: bash
+        env:
+          VALUES_KEY: ${{ steps.target.outputs.values_key }}
+          VALUES_FILE: ${{ steps.target.outputs.values_file }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          VALUES_KEY="${VALUES_KEY}" \
+          IMAGE_TAG="${IMAGE_TAG}" \
+            yq -i \
+            '.[strenv(VALUES_KEY)].image.tag = strenv(IMAGE_TAG)' \
+            "${VALUES_FILE}"
+
+      - name: Validate Helm configuration
+        if: steps.state.outputs.changed == 'true'
+        shell: bash
+        env:
+          VALUES_FILE: ${{ steps.target.outputs.values_file }}
+          CHART_PATH: ${{ steps.target.outputs.chart_path }}
+          NAMESPACE: ${{ steps.target.outputs.namespace }}
+        run: |
+          set -euo pipefail
+
+          helm lint \
+            "${CHART_PATH}" \
+            --strict \
+            -f "${VALUES_FILE}"
+
+          helm template \
+            online-boutique \
+            "${CHART_PATH}" \
+            --namespace "${NAMESPACE}" \
+            -f "${VALUES_FILE}" \
+            > /tmp/rendered.yaml
+
+      - name: Validate rendered artifact
+        if: steps.state.outputs.changed == 'true'
+        shell: bash
+        env:
+          WORKLOAD_NAME: ${{ steps.target.outputs.workload_name }}
+          CONTAINER_NAME: ${{ steps.target.outputs.container_name }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          RENDERED_IMAGE="$(
+            WORKLOAD_NAME="${WORKLOAD_NAME}" \
+            CONTAINER_NAME="${CONTAINER_NAME}" \
+              yq -r '
+                select(
+                  .kind == "Deployment" and
+                  .metadata.name == strenv(WORKLOAD_NAME)
+                )
+                |
+                .spec.template.spec.containers[]
+                |
+                select(.name == strenv(CONTAINER_NAME))
+                |
+                .image
+              ' /tmp/rendered.yaml
+          )"
+
+          [[ -n "${RENDERED_IMAGE}" ]] \
+            || {
+              echo "Unable to resolve rendered image." >&2
+              exit 1
+            }
+
+          echo "Rendered image: ${RENDERED_IMAGE}"
+
+          [[ "${RENDERED_IMAGE}" == *":${IMAGE_TAG}" ]] \
+            || {
+              echo "Rendered workload does not use ${IMAGE_TAG}." >&2
+              exit 1
+            }
+
+      - name: Validate repository diff
+        if: steps.state.outputs.changed == 'true'
+        shell: bash
+        env:
+          VALUES_FILE: ${{ steps.target.outputs.values_file }}
+        run: |
+          set -euo pipefail
+
+          git diff --check
+
+          CHANGED_FILES="$(git diff --name-only)"
+
+          [[ "${CHANGED_FILES}" == "${VALUES_FILE}" ]] \
+            || {
+              echo "Promotion modified unexpected files:" >&2
+              echo "${CHANGED_FILES}" >&2
+              exit 1
+            }
+
+          git diff -- "${VALUES_FILE}"
+
+      - name: Create promotion branch
+        if: steps.state.outputs.changed == 'true'
+        id: branch
+        shell: bash
+        env:
+          SERVICE: ${{ inputs.service }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          SHA="${IMAGE_TAG#ci-}"
+          SHORT_SHA="${SHA:0:12}"
+
+          BRANCH="promote/${SERVICE}-${ENVIRONMENT}-${SHORT_SHA}-${GITHUB_RUN_ID}"
+
+          git switch -c "${BRANCH}"
+
+          echo "name=${BRANCH}" >> "${GITHUB_OUTPUT}"
+
+      - name: Commit promotion
+        if: steps.state.outputs.changed == 'true'
+        shell: bash
+        env:
+          SERVICE: ${{ inputs.service }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          VALUES_FILE: ${{ steps.target.outputs.values_file }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add "${VALUES_FILE}"
+
+          git diff --cached --check
+
+          git commit \
+            -m "chore(${ENVIRONMENT}): promote ${SERVICE} to ${IMAGE_TAG}"
+
+      - name: Push promotion branch
+        if: steps.state.outputs.changed == 'true'
+        shell: bash
+        env:
+          PROMOTION_BRANCH: ${{ steps.branch.outputs.name }}
+        run: |
+          set -euo pipefail
+
+          git push \
+            --set-upstream origin \
+            "${PROMOTION_BRANCH}"
+
+      - name: Create promotion pull request
+        if: steps.state.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SERVICE: ${{ inputs.service }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          PROMOTION_BRANCH: ${{ steps.branch.outputs.name }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          cat > /tmp/pr-body.md <<EOF
+          ## Summary
+
+          - promote ${SERVICE} to ${IMAGE_TAG} in the ${ENVIRONMENT} environment
+          - preserve the existing environment-specific registry and runtime configuration
+
+          ## Validation
+
+          - validate the promotion request against the GitOps promotion catalog
+          - validate the environment Helm values with Helm lint
+          - render the chart and verify the promoted workload uses ${IMAGE_TAG}
+          EOF
+
+          gh pr create \
+            --base "${BASE_BRANCH}" \
+            --head "${PROMOTION_BRANCH}" \
+            --title "Promote ${SERVICE} to ${IMAGE_TAG} in ${ENVIRONMENT}" \
+            --body-file /tmp/pr-body.md
