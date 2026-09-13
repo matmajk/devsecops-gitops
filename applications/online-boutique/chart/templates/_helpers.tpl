@@ -44,7 +44,9 @@ app.kubernetes.io/part-of: {{ include "online-boutique.name" .root }}
 Container image for Online Boutique application services.
 */}}
 {{- define "online-boutique.appImage" -}}
-{{- printf "%s/%s:%s" .root.Values.global.imageRepository .name .root.Values.global.imageTag -}}
+{{- $repository := default .root.Values.global.imageRepository .repository -}}
+{{- $tag := default .root.Values.global.imageTag .tag -}}
+{{- printf "%s/%s:%s" $repository .name $tag -}}
 {{- end }}
 
 {{/*

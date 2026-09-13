@@ -23,6 +23,10 @@ spec:
           "component" "catalog"
         ) | nindent 8 }}
     spec:
+      {{- with .Values.productCatalogService.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       serviceAccountName: productcatalogservice
       terminationGracePeriodSeconds: 5
       securityContext:
@@ -32,6 +36,8 @@ spec:
           image: {{ include "online-boutique.appImage" (dict
             "root" .
             "name" .Values.productCatalogService.image.name
+            "repository" .Values.productCatalogService.image.repository
+            "tag" .Values.productCatalogService.image.tag
           ) | quote }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           securityContext:
