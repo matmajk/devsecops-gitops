@@ -54,6 +54,9 @@ productCatalogService:
   enabled: true
   image:
     name: productcatalogservice
+    repository: ""
+    tag: ""
+  imagePullSecrets: []
   replicaCount: 1
   containerPort: 3550
   service:

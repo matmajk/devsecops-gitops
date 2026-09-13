@@ -50,7 +50,7 @@ intended for development and integration testing.
 The chart follows a set of conventions intended to keep workload
 definitions consistent while preserving service-specific configuration.
 
-### Common workload configuration
+### Common Workload Configuration
 
 Configuration shared by Online Boutique workloads is centralized in
 `values.yaml` and reusable Helm helpers.
@@ -82,7 +82,7 @@ global:
 ```
 Reusable template logic is implemented in `_helpers.tpl`.
 
-## Service-specific configuration
+## Service-Specific Configuration
 
 Configuration that represents workload-specific behavior remains defined
 independently for each service.
@@ -98,7 +98,7 @@ This includes:
 This avoids over-generalizing workloads whose operational requirements
 are different.
 
-### Deployment selectors
+### Deployment Selectors
 
 Deployment and Service selectors intentionally remain explicit and stable.
 
@@ -111,13 +111,47 @@ selector:
 Deployment selectors are not generated from the common metadata label
 helper because `Deployment.spec.selector` is immutable after creation.
 
-## Container images
+## Container Images
 
-Online Boutique application images use the shared `appImage` helper and
-the global image repository and tag.
+Online Boutique application services use the shared `appImage` helper to construct container image references.
 
-Third-party workloads, such as Redis, maintain their own image repository
-and version configuration.
+By default, application services inherit the global image repository and tag:
+
+```yaml
+global:
+  imageRepository: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo
+  imageTag: "v0.10.6"
+```
+
+This keeps the standard Online Boutique deployment configuration centralized.
+
+Individual services can optionally override the image repository or tag when an independently built artifact must be deployed.
+
+For example:
+
+```yaml
+productCatalogService:
+  image:
+    name: productcatalogservice
+    repository: "<registry>/online-boutique-docker-local"
+    tag: "ci-<git-sha>"
+```
+
+If `repository` or `tag` is empty, the corresponding global value is used.
+
+This allows a single service to use a custom image without changing the image source for the remaining Online Boutique workloads.
+
+For private registries, a service can also reference Kubernetes image pull secrets:
+
+```yaml
+productCatalogService:
+  imagePullSecrets:
+    - name: jfrog-registry
+```
+
+Registry credentials are not stored in Helm values or committed to Git. The referenced Kubernetes Secret must exist in the workload namespace before the Pod is scheduled.
+
+Third-party workloads, such as Redis, maintain their own image repository and version configuration.
 
 ## Load Generation
 
@@ -205,7 +239,8 @@ The schema validates, among other things:
 - container and Service port ranges
 - supported Kubernetes Service types
 - image pull policies
-- container image configuration
+- global and service-specific container image configuration
+- private registry image pull secret references
 - service dependency addresses
 - resource configuration structure
 - common Pod and container security settings
