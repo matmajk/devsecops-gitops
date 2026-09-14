@@ -419,7 +419,7 @@ jobs:
           - validate the promotion target against the promotion catalog
           - validate the environment values with Helm lint and template rendering
           - verify the rendered workload references ${IMAGE_TAG}
-          EOF 
+          EOF
 
           PR_URL="$(
             gh pr create \
