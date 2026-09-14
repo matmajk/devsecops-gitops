@@ -24,7 +24,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: promotion-${{ inputs.service || github.event.client_payload.service }}-${{ inputs.environment || github.event.client_payload.environment }}
+  group: promotion-${{ inputs.service || github.event.client_payload.service }}
   cancel-in-progress: false
 
 env:
@@ -37,7 +37,7 @@ jobs:
 
     env:
       SERVICE: ${{ inputs.service || github.event.client_payload.service }}
-      ENVIRONMENT: ${{ inputs.environment || github.event.client_payload.environment }}
+      REQUESTED_ENVIRONMENT: ${{ inputs.environment || '' }}
       IMAGE_TAG: ${{ inputs.image_tag || github.event.client_payload.image_tag }}
       SOURCE_SHA: ${{ github.event.client_payload.source_sha || '' }}
 
@@ -69,12 +69,6 @@ jobs:
               exit 1
             }
 
-          [[ "${ENVIRONMENT}" =~ ^[a-z0-9-]+$ ]] \
-            || {
-              echo "Invalid environment identifier: ${ENVIRONMENT}" >&2
-              exit 1
-            }
-
           if [[ "${GITHUB_EVENT_NAME}" == "repository_dispatch" ]]; then
             [[ "${SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]] \
               || {
@@ -90,6 +84,12 @@ jobs:
                 exit 1
               }
           else
+            [[ "${REQUESTED_ENVIRONMENT}" =~ ^[a-z0-9-]+$ ]] \
+              || {
+                echo "Invalid environment identifier: ${REQUESTED_ENVIRONMENT}" >&2
+                exit 1
+              }
+
             [[ "${IMAGE_TAG}" =~ ^ci-[0-9a-f]{40}$ ]] \
               || {
                 echo "Invalid image tag: ${IMAGE_TAG}" >&2
@@ -103,6 +103,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "repository_dispatch" ]]; then
+            ENVIRONMENT="$(
+              yq -r \
+                '.defaults.automatedEnvironment // ""' \
+                "${PROMOTION_CATALOG}"
+            )"
+
+            [[ -n "${ENVIRONMENT}" ]] \
+              || {
+                echo "Automated promotion environment is not configured." >&2
+                exit 1
+              }
+          else
+            ENVIRONMENT="${REQUESTED_ENVIRONMENT}"
+          fi
+
+          echo "Promotion environment: ${ENVIRONMENT}"
 
           VALUES_KEY="$(
             SERVICE="${SERVICE}" \
@@ -176,7 +194,10 @@ jobs:
               exit 1
             }
 
+          echo "ENVIRONMENT=${ENVIRONMENT}" >> "${GITHUB_ENV}"
+
           {
+            echo "environment=${ENVIRONMENT}"
             echo "values_key=${VALUES_KEY}"
             echo "workload_name=${WORKLOAD_NAME}"
             echo "container_name=${CONTAINER_NAME}"

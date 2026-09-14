@@ -1,3 +1,6 @@
+defaults:
+  automatedEnvironment: local
+
 services:
   productcatalogservice:
     valuesKey: productCatalogService
