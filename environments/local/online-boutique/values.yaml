@@ -8,6 +8,6 @@ productCatalogService:
   replicaCount: 1
   image:
     repository: "host.docker.internal:8082/online-boutique-docker-local"
-    tag: "ci-f3fffcbd04a10db677b1717716b8e98006137827"
+    tag: "ci-878f49e73f60fdcf334c841aa4b748259aef7b08"
   imagePullSecrets:
     - name: jfrog-registry
