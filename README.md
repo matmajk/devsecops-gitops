@@ -201,6 +201,18 @@ Build once
   Prod
 ```
 
+### Automatic Artifact Promotion
+
+Automated artifact promotions may be configured for automatic merging on a
+per-environment basis through the promotion catalog.
+
+Automatic merging applies only to promotions initiated by verified
+`artifact-published` events. Manually requested promotions continue to require
+an explicit pull request merge.
+
+The local environment currently enables automatic merging to minimize manual
+steps in the local delivery path.
+
 ## Promotion Catalog
 
 The promotion workflow is designed as a reusable mechanism for multiple application services and environments.

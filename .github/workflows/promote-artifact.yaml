@@ -164,6 +164,19 @@ jobs:
               "${PROMOTION_CATALOG}"
           )"
 
+          AUTO_MERGE="$(
+            ENVIRONMENT="${ENVIRONMENT}" \
+              yq -r \
+              '.environments[strenv(ENVIRONMENT)].autoMerge // false' \
+              "${PROMOTION_CATALOG}"
+          )"
+
+          [[ "${AUTO_MERGE}" == "true" || "${AUTO_MERGE}" == "false" ]] \
+            || {
+              echo "Invalid autoMerge value for environment '${ENVIRONMENT}': ${AUTO_MERGE}" >&2
+              exit 1
+            }
+
           [[ -n "${VALUES_KEY}" ]] \
             || {
               echo "Service '${SERVICE}' is not registered for promotion." >&2
@@ -204,6 +217,7 @@ jobs:
             echo "values_file=${VALUES_FILE}"
             echo "chart_path=${CHART_PATH}"
             echo "namespace=${NAMESPACE}"
+            echo "auto_merge=${AUTO_MERGE}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Read current image tag
@@ -385,6 +399,7 @@ jobs:
             "${PROMOTION_BRANCH}"
 
       - name: Create promotion pull request
+        id: pull_request
         if: steps.state.outputs.changed == 'true'
         shell: bash
         env:
@@ -396,19 +411,46 @@ jobs:
 
           cat > /tmp/pr-body.md <<EOF
           ## Summary
-
-          - promote ${SERVICE} to ${IMAGE_TAG} in the ${ENVIRONMENT} environment
-          - preserve the existing environment-specific registry and runtime configuration
+          - promote ${SERVICE} in ${ENVIRONMENT} to ${IMAGE_TAG}
+          - update only the environment-specific image tag
+          - preserve the immutable artifact produced by application CI
 
           ## Validation
+          - validate the promotion target against the promotion catalog
+          - validate the environment values with Helm lint and template rendering
+          - verify the rendered workload references ${IMAGE_TAG}
+          EOF 
 
-          - validate the promotion request against the GitOps promotion catalog
-          - validate the environment Helm values with Helm lint
-          - render the chart and verify the promoted workload uses ${IMAGE_TAG}
-          EOF
+          PR_URL="$(
+            gh pr create \
+              --base "${BASE_BRANCH}" \
+              --head "${PROMOTION_BRANCH}" \
+              --title "Promote ${SERVICE} to ${IMAGE_TAG} in ${ENVIRONMENT}" \
+              --body-file /tmp/pr-body.md
+          )"
 
-          gh pr create \
-            --base "${BASE_BRANCH}" \
-            --head "${PROMOTION_BRANCH}" \
-            --title "Promote ${SERVICE} to ${IMAGE_TAG} in ${ENVIRONMENT}" \
-            --body-file /tmp/pr-body.md
+          echo "Created promotion PR: ${PR_URL}"
+          echo "pr_url=${PR_URL}" >> "${GITHUB_OUTPUT}"
+
+      - name: Merge automated promotion
+        if: >
+          github.event_name == 'repository_dispatch' &&
+          steps.target.outputs.auto_merge == 'true' &&
+          steps.pull_request.outputs.pr_url != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ steps.pull_request.outputs.pr_url }}
+        run: |
+          set -euo pipefail
+
+          echo "Automatically merging promotion:"
+          echo "  service:     ${SERVICE}"
+          echo "  environment: ${ENVIRONMENT}"
+          echo "  image tag:   ${IMAGE_TAG}"
+          echo "  pull request: ${PR_URL}"
+
+          gh pr merge \
+            "${PR_URL}" \
+            --squash \
+            --delete-branch

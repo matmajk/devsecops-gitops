@@ -12,3 +12,4 @@ environments:
     valuesFile: environments/local/online-boutique/values.yaml
     chartPath: applications/online-boutique/chart
     namespace: online-boutique
+    autoMerge: true
