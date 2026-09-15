@@ -2,20 +2,20 @@
 
 Source of truth for the Kubernetes desired state of the `devsecops-gcp-platform` project.
 
-This repository contains the declarative deployment configuration consumed by Argo CD.
+This repository contains the declarative deployment configuration consumed by Argo CD and represents the deployment side of the platform CI/CD flow.
 
-Application source code and CI pipelines are maintained separately from the Kubernetes desired state.
+Application source code, artifact creation, infrastructure provisioning and Kubernetes desired state are intentionally maintained in separate repositories.
 
 ## Responsibilities
 
 This repository owns:
 
-* Argo CD application definitions
+* Argo CD bootstrap and application definitions
 * Kubernetes desired state
 * Online Boutique Helm deployment configuration
 * environment-specific Helm values
 * observability deployment configuration
-* workload enablement and resource profiles
+* workload activation
 * application image versions selected for deployment
 * artifact promotion into environment-specific desired state
 
@@ -30,7 +30,7 @@ It does not own:
 * Kind cluster lifecycle
 * GCP infrastructure provisioning
 
-These responsibilities are maintained in the application and infrastructure repositories.
+Those responsibilities belong to the application and infrastructure repositories.
 
 ## GitOps Model
 
@@ -44,11 +44,49 @@ GitOps Repository
    Kubernetes
 ```
 
-Changes to managed workloads are introduced through Git.
+Changes to Argo CD-managed workloads are introduced through Git rather than direct deployment commands.
 
-Argo CD continuously reconciles the desired state stored in this repository with the actual state of the Kubernetes cluster.
+Argo CD continuously compares the desired state stored in this repository with the state running in Kubernetes and reconciles detected differences.
 
-Application CI does not deploy workloads directly with `kubectl`.
+Application CI does not deploy workloads directly with `kubectl` or Helm.
+
+## End-to-End Delivery Flow
+
+The validated local delivery path is:
+
+```text
+    Application Repository
+              ↓
+             CI
+              ↓
+ Build/Test/Security Validation
+              ↓
+       Container Image
+              ↓
+            JFrog
+              ↓
+   artifact-published event
+              ↓
+  GitOps Promotion Workflow
+              ↓
+Environment Image Version Update
+              ↓
+         Pull Request
+              ↓
+            Merge
+              ↓
+           Argo CD
+              ↓
+       Kind Kubernetes
+```
+
+The application pipeline is responsible for producing and validating an immutable artifact.
+
+The GitOps repository is responsible for selecting that artifact for deployment.
+
+Argo CD is responsible for reconciling the resulting desired state into Kubernetes.
+
+This separation ensures that CI never requires direct deployment access to the cluster.
 
 ## Repository Structure
 
@@ -62,12 +100,24 @@ Application CI does not deploy workloads directly with `kubectl`.
 │           ├── values.schema.json
 │           └── README.md
 │
+├── argocd/
+│   ├── bootstrap/
+│   ├── projects/
+│   ├── applications/
+│   ├── kustomization.yaml
+│   └── README.md
+│
 ├── environments/
 │   └── local/
 │       ├── online-boutique/
 │       │   └── values.yaml
 │       └── observability/
-│           └── ...
+│           ├── kube-prometheus-stack-values.yaml
+│           ├── loki-values.yaml
+│           ├── alloy-values.yaml
+│           ├── opentelemetry-collector-values.yaml
+│           ├── jaeger-values.yaml
+│           └── README.md
 │
 └── .github/
     ├── promotion/
@@ -80,9 +130,34 @@ The base Helm chart defines reusable application defaults.
 
 Environment directories contain only configuration that differs for a particular deployment environment.
 
+## Argo CD
+
+Argo CD manages the Kubernetes lifecycle of workloads defined in this repository.
+
+The local GitOps hierarchy is:
+
+```text
+platform-root
+├── AppProjects
+└── Applications
+    ├── Online Boutique
+    ├── Metrics
+    ├── Logging
+    └── Tracing
+```
+
+The root Application reconciles Argo CD projects and child Applications.
+
+Child Applications then reconcile their respective Helm-based workloads.
+
+Argo CD-managed resources use automated synchronization, pruning and self-healing.
+
+Detailed Argo CD behaviour is documented in: [argocd/README.md](argocd/README.md)
+
+
 ## Online Boutique
 
-The Online Boutique application is deployed through a custom Helm chart located under:
+The Online Boutique application is deployed through the custom Helm chart located at:
 
 ```text
 applications/online-boutique/chart/
@@ -97,56 +172,52 @@ The chart defines:
 * resource requests and limits
 * readiness and liveness probes
 * application dependencies
-* tracing configuration
+* distributed tracing configuration
 * container image configuration
 
-Detailed chart behaviour and configuration are documented in:
-`applications/online-boutique/chart/README.md`
-
+Detailed chart behaviour is documented in:
+[chart/README.md](applications/online-boutique/chart/README.md)
 
 ## Environment Configuration
 
-Environment-specific configuration is maintained separately from the base Helm chart.
+Environment-specific configuration is maintained separately from the reusable Helm chart.
 
-The current local environment uses:
-`environments/local/online-boutique/values.yaml`
+The local environment uses:
+
+```text
+environments/local/online-boutique/values.yaml
+```
 
 Environment values can override configuration such as:
 
-* enabled workloads
+* replicas
 * resource profiles
 * tracing configuration
 * container image repository
 * container image tag
 * image pull secret references
+* workload-specific settings
 
-The local environment currently runs on Kind.
+The current environment runs on a local Kind cluster.
 
-Future cloud environments are expected to introduce separate configuration for:
-- dev
-- staging
-- prod
-
-The same base Helm chart should be reused across environments wherever possible.
+Future cloud environments can provide separate values while reusing the same base chart.
 
 ## Container Images
 
-Application services use global image configuration from the base Helm chart by default.
+Online Boutique services use the global image configuration from the base chart unless a service-specific override is defined.
 
-Individual services can override the image repository and tag through environment-specific values.
-
-This allows independently built application artifacts to be deployed without changing the image source of unrelated services.
+This allows independently built artifacts to be deployed without changing unrelated workloads.
 
 For example:
 
 ```text
-   productcatalogservice
-             ↓
- custom validated artifact
+     productcatalogservice
+               ↓
+validated CI artifact from JFrog
 
-     remaining services
-             ↓
-default Online Boutique images
+      remaining services
+               ↓
+  default Online Boutique images
 ```
 
 Container registry credentials are not stored in Git.
@@ -155,97 +226,84 @@ Private registry authentication is provided to Kubernetes through runtime-manage
 
 ## Artifact Promotion
 
-Artifact promotion is owned by the GitOps repository.
+Artifact promotion modifies the desired state stored in Git.
 
-Promotion changes the desired state rather than deploying directly to Kubernetes.
-
-The promotion flow is:
+It does not deploy directly to Kubernetes.
 
 ```text
-   Verified Artifact
-           ↓
-   Artifact Promotion
-           ↓
-Environment Desired State
-           ↓
-    Git Pull Request
-           ↓
-         Merge
-           ↓
-        Argo CD
-           ↓
-       Kubernetes
+Validated Artifact
+        ↓
+      JFrog
+        ↓
+Promotion Workflow
+        ↓
+Environment Values
+        ↓
+Pull Request
+        ↓
+      Merge
+        ↓
+     Argo CD
+        ↓
+   Kubernetes
 ```
 
-The promotion workflow updates only the immutable application image version.
+Only immutable image versions are promoted.
 
-Environment-specific configuration such as:
+Environment-specific configuration such as registry locations, image pull secrets and infrastructure settings remains unchanged.
 
-* container registry location
-* image pull secrets
-* infrastructure-specific settings
-
-is not modified by artifact promotion.
-
-This separation allows the same artifact to be promoted between environments without rebuilding it.
+This implements the:
 
 ```text
 Build once
-    ↓
-  JFrog
-    ↓
-   Dev
-    ↓
- Staging
-    ↓
-  Prod
+     ↓
+  Promote
+     ↓
+   Deploy
 ```
 
-### Automatic Artifact Promotion
-
-Automated artifact promotions may be configured for automatic merging on a
-per-environment basis through the promotion catalog.
-
-Automatic merging applies only to promotions initiated by verified
-`artifact-published` events. Manually requested promotions continue to require
-an explicit pull request merge.
-
-The local environment currently enables automatic merging to minimize manual
-steps in the local delivery path.
+model without rebuilding an artifact between environments.
 
 ## Promotion Catalog
 
-The promotion workflow is designed as a reusable mechanism for multiple application services and environments.
+Supported promotion targets are declared in:
 
-Supported promotion targets are defined explicitly in: `.github/promotion/catalog.yaml`
+```text
+.github/promotion/catalog.yaml
+```
 
+The catalog maps:
 
-The catalog maps external service identifiers to their Helm values configuration and maps deployment environments to their values files.
+```text
+   service identifier
+           ↓
+Helm values configuration
+
+      environment
+           ↓
+environment values file
+```
 
 This provides:
 
 * an explicit allowlist of promotable services
 * centralized service-to-values mapping
-* centralized environment configuration
-* one promotion workflow shared by multiple microservices
+* centralized environment mapping
+* one reusable promotion workflow
 
-The initial implementation supports:
+The currently validated end-to-end promotion path includes `productcatalogservice` in the `local` environment.
 
-```text
-service:
-  productcatalogservice
-
-environment:
-  local
-```
-
-Additional services are added to the promotion catalog only after their CI pipeline publishes validated artifacts.
+Additional services can be added to the catalog as their CI pipelines begin publishing validated artifacts.
 
 ## Promotion Workflow
 
-The generic promotion workflow is located at: `.github/workflows/promote-artifact.yaml`
+The reusable promotion workflow is located at:
 
-The workflow receives:
+```text
+.github/workflows/promote-artifact.yaml
+```
+
+It accepts:
 
 ```text
 service
@@ -256,98 +314,115 @@ image_tag
 and performs:
 
 ```text
-      validate inputs
-            ↓
-     resolve service
-            ↓
-    resolve environment
-            ↓
-    update image tag
-            ↓
-validate Helm configuration
-            ↓
-    render manifests
-            ↓
- create promotion branch
-            ↓
-   create pull request
+         validate request
+                ↓
+     resolve promotion target
+                ↓
+       update image version
+                ↓
+    validate Helm configuration
+                ↓
+        render manifests
+                ↓
+     create promotion branch
+                ↓
+       create pull request
+                ↓
+merge according to environment policy
 ```
 
-The workflow does not:
+Validated application pipelines can trigger promotion using an `artifact-published` repository event.
 
-* build application source code
-* rebuild container images
-* scan artifacts
-* access Kubernetes directly
-* perform `kubectl` deployment operations
+Manual promotion is also available through `workflow_dispatch`.
 
-Those concerns belong to CI or Argo CD.
+Automatic merging can be configured per environment through the promotion catalog.
 
-Artifact promotion can be initiated either manually or automatically.
+The local environment uses automatic merge for validated CI-triggered promotions to provide a fully automated local delivery path.
 
-Manual promotions use `workflow_dispatch` and are useful for controlled
-re-promotion of existing artifacts.
+Manually requested promotions remain reviewable through the pull request workflow.
 
-Validated artifacts can also be submitted through the `artifact-published`
-repository dispatch event.
+## Local Workload Activation
 
-Both entry points use the same promotion engine and promotion catalog.
+Not every platform workload must remain active continuously in the local environment.
 
-## Argo CD
-
-Argo CD observes changes to the desired state stored in this repository.
-
-After a promotion pull request is merged:
+Active Argo CD Applications are selected through:
 
 ```text
-       GitOps main
-            ↓
-  Argo CD detects change
-            ↓
-Application becomes OutOfSync
-            ↓
-  Argo CD reconciliation
-            ↓
-    Kubernetes rollout
+argocd/kustomization.yaml
 ```
 
-The cluster state should not be modified manually when the resource is managed by Argo CD.
+This allows resource-intensive layers such as logging and tracing to be enabled only when required.
 
-Manual Kubernetes changes may be overwritten during reconciliation.
+Application definitions can remain available under:
+
+```text
+argocd/applications/
+```
+
+without being part of the currently active local profile.
+
+Argo CD pruning and Application finalizers provide declarative cleanup when a workload is removed from the active set.
 
 ## Observability
 
-The local Kubernetes environment includes GitOps-managed observability components such as:
+The local environment supports GitOps-managed:
 
 * Prometheus
 * Grafana
 * Loki
+* Grafana Alloy
 * OpenTelemetry Collector
 * Jaeger
 
-Observability-specific deployment details are maintained with the local observability configuration rather than duplicated in this repository overview.
+The stack is intentionally modular so metrics, logging and tracing can be enabled independently depending on the development scenario.
 
-## Current Delivery State
-
-The currently validated delivery path is:
+Detailed configuration is documented in:
 
 ```text
-      Application CI
-            ↓
-Validated container image
-            ↓
-          JFrog
-            ↓
-   GitOps image version
-            ↓
-         Argo CD
-            ↓
-     Kind Kubernetes
+environments/local/observability/README.md
 ```
 
-The JFrog-to-GitOps promotion step has been validated manually for `productcatalogservice`.
+## Security Model
 
-The current implementation milestone is replacing the manual desired-state update with the reusable GitOps artifact promotion workflow.
+The GitOps repository does not contain registry credentials or other runtime secrets.
+
+Application workloads use restrictive Kubernetes security settings including:
+
+* non-root execution
+* disabled privilege escalation
+* dropped Linux capabilities
+* read-only root filesystems where supported
+
+Artifact security validation is performed before promotion by the application CI pipeline.
+
+Only artifacts that successfully complete the CI validation flow are submitted to the GitOps promotion path.
+
+## Validation
+
+Validate the Online Boutique chart:
+
+```bash
+helm lint \
+  applications/online-boutique/chart \
+  --strict \
+  -f environments/local/online-boutique/values.yaml
+```
+
+Render the environment locally:
+
+```bash
+helm template \
+  online-boutique \
+  applications/online-boutique/chart \
+  --namespace online-boutique \
+  -f environments/local/online-boutique/values.yaml
+```
+
+Render the active Argo CD configuration:
+
+```bash
+kubectl kustomize argocd
+```
 
 ## Design Principles
 
@@ -355,9 +430,11 @@ The repository follows these principles:
 
 * Git is the source of truth for Kubernetes desired state.
 * CI does not deploy directly to Kubernetes.
-* Argo CD is responsible for reconciliation.
-* Container artifacts are built once and promoted without rebuilding.
-* Environment configuration is separated from application defaults.
+* Argo CD owns workload reconciliation.
+* Artifacts are built once and promoted without rebuilding.
+* Environment configuration is separated from reusable application defaults.
 * Secrets and registry credentials are not committed to Git.
-* Promotion changes artifact versions rather than environment infrastructure.
-* Shared promotion logic is preferred over per-service workflow duplication.
+* Promotion changes application versions rather than environment infrastructure.
+* Deployment configuration is validated before promotion is merged.
+* Shared promotion logic is preferred over workflow duplication.
+* Local workloads can be activated independently to control workstation resource consumption.
