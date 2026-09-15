@@ -4,6 +4,22 @@ Custom Helm chart used to deploy the Online Boutique microservices application a
 
 The chart provides the reusable Kubernetes application definition, while environment-specific behaviour is supplied through separate values files.
 
+## Table of Contents
+
+- [Workloads](#workloads)
+- [Chart Design](#chart-design)
+- [Shared Configuration](#shared-configuration)
+- [Security Defaults](#security-defaults)
+- [Service-Specific Configuration](#service-specific-configuration)
+- [Container Images](#container-images)
+- [Private Registry Authentication](#private-registry-authentication)
+- [Load Generation](#load-generation)
+- [Distributed Tracing](#distributed-tracing)
+- [Environment Model](#environment-model)
+- [Values Schema](#values-schema)
+- [Validation](#validation)
+- [Related Documentation](#related-documentation)
+
 ## Workloads
 
 The chart currently defines:
@@ -287,3 +303,11 @@ helm template \
 ```
 
 Both commands apply `values.schema.json` validation before producing the resulting manifests.
+
+## Related Documentation
+
+For repository-level GitOps architecture and artifact promotion, see the [GitOps repository README](../../../README.md).
+
+For Argo CD reconciliation and workload ownership, see the [Argo CD documentation](../../../argocd/README.md).
+
+For local metrics, logging and tracing configuration, see [Local Observability](../../../environments/local/observability/README.md).

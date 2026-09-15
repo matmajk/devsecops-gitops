@@ -4,6 +4,22 @@ This directory contains the Argo CD configuration used to manage workloads in th
 
 Argo CD provides the reconciliation layer between the desired state stored in Git and the workloads running in Kubernetes.
 
+## Table of Contents
+
+- [Directory Structure](#directory-structure)
+- [Bootstrap Model](#bootstrap-model)
+- [Bootstrap](#bootstrap)
+- [GitOps Hierarchy](#gitops-hierarchy)
+- [Automated Reconciliation](#automated-reconciliation)
+- [Resource Ownership](#resource-ownership)
+- [Local Workload Activation](#local-workload-activation)
+  - [Enabling a Workload](#enabling-a-workload)
+  - [Disabling a Workload](#disabling-a-workload)
+- [Resource-Constrained Local Profiles](#resource-constrained-local-profiles)
+- [Access](#access)
+- [Validation](#validation)
+- [Related Documentation](#related-documentation)
+
 ## Directory Structure
 
 ```text
@@ -314,3 +330,11 @@ kubectl get pods -A
 ```
 
 Normal application lifecycle changes should not require manual Argo CD refreshes; reconciliation is expected to occur automatically.
+
+## Related Documentation
+
+For repository-level GitOps architecture and artifact promotion, see the [GitOps repository README](../README.md).
+
+For the application managed by Argo CD, see the [Online Boutique Helm Chart](../applications/online-boutique/chart/README.md).
+
+For metrics, logging and tracing Applications, see [Local Observability](../environments/local/observability/README.md).
