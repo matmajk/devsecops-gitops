@@ -1,31 +1,32 @@
 # Online Boutique Helm Chart
 
-Custom Helm chart used to deploy the Online Boutique microservices
-application as part of the DevSecOps platform.
+Custom Helm chart used to deploy the Online Boutique microservices application as part of the DevSecOps platform.
 
-## Current Status
+The chart provides the reusable Kubernetes application definition, while environment-specific behaviour is supplied through separate values files.
 
-Implemented workloads:
+## Workloads
 
-- frontend
-- productcatalogservice
-- currencyservice
-- recommendationservice
-- adservice
-- redis-cart
-- cartservice
-- shippingservice
-- paymentservice
-- emailservice
-- checkoutservice
-- loadgenerator
+The chart currently defines:
 
-### Diagram
+* frontend
+* productcatalogservice
+* currencyservice
+* recommendationservice
+* adservice
+* redis-cart
+* cartservice
+* shippingservice
+* paymentservice
+* emailservice
+* checkoutservice
+* loadgenerator
+
+The application covers the complete Online Boutique purchase flow, including:
 
 ```text
 Frontend
 └── Checkout Service
-    ├── Cart Service ── Redis
+    ├── Cart Service - Redis
     ├── Product Catalog
     ├── Currency Service
     ├── Payment Service
@@ -33,36 +34,41 @@ Frontend
     └── Email Service
 ```
 
-Additional microservices will be introduced incrementally.
+Redis uses ephemeral storage in the local environment and is intended for development and integration testing.
 
-## Current Application Slice
+## Chart Design
 
-The current Helm chart supports the complete core Online Boutique
-purchase flow, including product browsing, cart persistence,
-shipping calculation, payment processing, checkout orchestration
-and order confirmation.
+The chart separates configuration into:
 
-The local Redis deployment uses ephemeral storage and is
-intended for development and integration testing.
+```text
+shared application configuration
+             +
+service-specific configuration
+```
 
-## Chart Conventions
+Shared settings are centralized in `values.yaml` and reusable Helm helpers.
 
-The chart follows a set of conventions intended to keep workload
-definitions consistent while preserving service-specific configuration.
+Service-specific behaviour remains explicit where workloads have different operational requirements.
 
-### Common Workload Configuration
+## Shared Configuration
 
-Configuration shared by Online Boutique workloads is centralized in
-`values.yaml` and reusable Helm helpers.
+Common configuration includes:
 
-The following settings are shared:
-- Pod security context
-- container security context
-- common Kubernetes metadata labels
-- Pod labels
-- Online Boutique application image construction
+* Kubernetes metadata
+* Pod security context
+* container security context
+* application image construction
+* distributed tracing configuration
 
-Common security settings are defined under:
+Reusable Helm logic is implemented in:
+
+```text
+templates/_helpers.tpl
+```
+
+## Security Defaults
+
+Common Pod security configuration includes non-root execution:
 
 ```yaml
 global:
@@ -71,7 +77,12 @@ global:
     runAsGroup: 1000
     runAsNonRoot: true
     runAsUser: 1000
+```
 
+Common container security configuration includes:
+
+```yaml
+global:
   containerSecurityContext:
     allowPrivilegeEscalation: false
     privileged: false
@@ -80,42 +91,30 @@ global:
       drop:
         - ALL
 ```
-Reusable template logic is implemented in `_helpers.tpl`.
+
+These defaults provide a restrictive baseline for application workloads.
 
 ## Service-Specific Configuration
 
-Configuration that represents workload-specific behavior remains defined
-independently for each service.
+Configuration that reflects workload-specific behaviour remains defined per service.
 
 This includes:
-- container and Service ports
-- environment variables
-- service dependencies
-- readiness and liveness probes
-- resource requests and limits
-- storage configuration
 
-This avoids over-generalizing workloads whose operational requirements
-are different.
+* container ports
+* Service ports
+* environment variables
+* service dependencies
+* readiness and liveness probes
+* resource requests and limits
+* storage configuration
 
-### Deployment Selectors
-
-Deployment and Service selectors intentionally remain explicit and stable.
-
-For example:
-```yaml
-selector:
-  matchLabels:
-    app.kubernetes.io/name: cartservice
-```
-Deployment selectors are not generated from the common metadata label
-helper because `Deployment.spec.selector` is immutable after creation.
+Deployment and Service selectors remain explicit and stable because `Deployment.spec.selector` is immutable after creation.
 
 ## Container Images
 
-Online Boutique application services use the shared `appImage` helper to construct container image references.
+Application services use a shared image helper.
 
-By default, application services inherit the global image repository and tag:
+Default images inherit:
 
 ```yaml
 global:
@@ -123,11 +122,9 @@ global:
   imageTag: "v0.10.6"
 ```
 
-This keeps the standard Online Boutique deployment configuration centralized.
+A service can override its repository or tag when a separately built artifact must be deployed.
 
-Individual services can optionally override the image repository or tag when an independently built artifact must be deployed.
-
-For example:
+Example:
 
 ```yaml
 productCatalogService:
@@ -137,11 +134,13 @@ productCatalogService:
     tag: "ci-<git-sha>"
 ```
 
-If `repository` or `tag` is empty, the corresponding global value is used.
+If a service-specific repository or tag is not provided, the corresponding global value is used.
 
-This allows a single service to use a custom image without changing the image source for the remaining Online Boutique workloads.
+This makes it possible to deploy a validated CI artifact for a single service without changing unrelated workloads.
 
-For private registries, a service can also reference Kubernetes image pull secrets:
+## Private Registry Authentication
+
+Services can reference Kubernetes image pull secrets:
 
 ```yaml
 productCatalogService:
@@ -149,17 +148,15 @@ productCatalogService:
     - name: jfrog-registry
 ```
 
-Registry credentials are not stored in Helm values or committed to Git. The referenced Kubernetes Secret must exist in the workload namespace before the Pod is scheduled.
+Registry credentials are not stored in Helm values or committed to Git.
 
-Third-party workloads, such as Redis, maintain their own image repository and version configuration.
+The referenced Kubernetes Secret must exist in the workload namespace before the Pod is scheduled.
 
 ## Load Generation
 
-The chart can optionally deploy the Online Boutique Load Generator,
-which uses Locust to continuously generate realistic shopping traffic
-against the frontend.
+The chart can optionally deploy the Online Boutique Load Generator.
 
-Load generation is disabled by default and can be enabled per environment.
+It uses Locust to generate application traffic against the frontend.
 
 Example:
 
@@ -169,21 +166,22 @@ loadGenerator:
   users: 10
   rate: 1
 ```
-`users` defines the target number of simulated users, while `rate`
-defines how quickly new users are spawned.
 
-The workload uses an init container to verify frontend availability
-before starting traffic generation.
+Load generation is useful for:
 
-The local environment enables the Load Generator to support integration
-testing, observability exercises, autoscaling experiments and failure
-testing.
+* integration testing
+* observability validation
+* tracing validation
+* autoscaling experiments
+* failure testing
+
+It can be disabled when workstation resources need to be conserved.
 
 ## Distributed Tracing
 
-The chart supports optional OpenTelemetry distributed tracing for Online Boutique services that provide tracing instrumentation in the upstream application.
+The chart supports optional OpenTelemetry tracing for services that include tracing instrumentation in the Online Boutique application baseline.
 
-Tracing is disabled by default and can be enabled through environment-specific values:
+Tracing is configured through environment values:
 
 ```yaml
 global:
@@ -192,90 +190,84 @@ global:
     collectorServiceAddress: "opentelemetry-collector.monitoring.svc.cluster.local:4317"
 ```
 
-When tracing is enabled, supported workloads receive the following environment variables:
-- ENABLE_TRACING=1
-- COLLECTOR_SERVICE_ADDR
-- OTEL_SERVICE_NAME
+Supported workloads receive:
 
-The common tracing environment configuration is rendered through a shared Helm helper to avoid duplicating tracing configuration across workload templates.
-
-Tracing is enabled only for services that support it in the application baseline used by this chart:
-- frontend
-- checkoutservice
-- currencyservice
-- emailservice
-- paymentservice
-- productcatalogservice
-- recommendationservice
-
-Services without upstream tracing support are intentionally left unchanged.
-
-The default chart configuration keeps tracing disabled so the chart does not require an OpenTelemetry backend unless the selected environment explicitly enables it.
-
-## Local Installation
-
-```bash
-helm upgrade \
-  --install online-boutique \
-  applications/online-boutique/chart \
-  --namespace online-boutique \
-  --create-namespace \
-  -f environments/local/online-boutique/values.yaml
+```text
+ENABLE_TRACING=1
+COLLECTOR_SERVICE_ADDR=<collector endpoint>
+OTEL_SERVICE_NAME=<service name>
 ```
 
-## Values Validation
+Tracing is enabled for supported services only:
 
-The chart defines its configuration contract using
-`values.schema.json`.
+* frontend
+* checkoutservice
+* currencyservice
+* emailservice
+* paymentservice
+* productcatalogservice
+* recommendationservice
 
-Helm automatically validates the final merged values before rendering or
-installing the chart.
+Services without upstream tracing support remain unchanged.
 
-The schema validates, among other things:
+Tracing configuration is rendered through shared Helm helpers to avoid repeating identical environment configuration across Deployment templates.
 
-- required workload configuration
-- configuration value types
-- replica counts
-- container and Service port ranges
-- supported Kubernetes Service types
-- image pull policies
-- global and service-specific container image configuration
-- private registry image pull secret references
-- service dependency addresses
-- resource configuration structure
-- common Pod and container security settings
+## Environment Model
 
-Unknown configuration properties are rejected to help detect
-configuration typos early.
+The chart contains reusable application defaults.
 
-For example, those invalid overrides:
+Environment-specific configuration is stored separately.
 
-```bash
-helm template \
-  online-boutique \
-  applications/online-boutique/chart \
-  --set frontend.replicaCont=3
-```
-is rejected because `replicaCont` is not part of the chart configuration
-contract.
+For the local environment:
 
-```bash
-helm template \
-  online-boutique \
-  applications/online-boutique/chart \
-  --set global.containerSecurityContext.privileged=true \
-  > /dev/null
-```
-is rejected because schema set constant boolean value for `privileged` property as `false`.
-
-```json
-"privileged": {
-  "type": "boolean",
-  "const": false
-}
+```text
+environments/local/online-boutique/values.yaml
 ```
 
-### Validate the chart
+The effective deployment configuration is therefore:
+
+```text
+base chart
+    +
+local values
+    ↓
+rendered Kubernetes manifests
+```
+
+The local environment is deployed and reconciled by Argo CD.
+
+Direct `helm install` or `helm upgrade` operations should not be used to manage the lifecycle of the Argo CD-managed deployment.
+
+## Values Schema
+
+The chart defines its configuration contract using:
+
+```text
+values.schema.json
+```
+
+Helm validates the merged values before rendering or deployment.
+
+The schema validates areas including:
+
+* required workload configuration
+* configuration value types
+* replica counts
+* container and Service ports
+* Kubernetes Service types
+* image pull policies
+* global and service-specific image configuration
+* image pull secret references
+* dependency addresses
+* resource configuration
+* Pod security configuration
+* container security configuration
+
+Unknown properties are rejected to detect configuration mistakes early.
+
+## Validation
+
+Lint the chart:
 
 ```bash
 helm lint \
@@ -284,7 +276,7 @@ helm lint \
   -f environments/local/online-boutique/values.yaml
 ```
 
-Render locally:
+Render the local environment:
 
 ```bash
 helm template \
@@ -294,5 +286,4 @@ helm template \
   -f environments/local/online-boutique/values.yaml
 ```
 
-The same schema validation is also performed during `helm install` and
-`helm upgrade`.
+Both commands apply `values.schema.json` validation before producing the resulting manifests.

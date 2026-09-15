@@ -1,7 +1,8 @@
 # Argo CD
 
-This directory contains the GitOps configuration used to deploy and
-manage workloads in Kubernetes using Argo CD.
+This directory contains the Argo CD configuration used to manage workloads in the DevSecOps Kubernetes platform.
+
+Argo CD provides the reconciliation layer between the desired state stored in Git and the workloads running in Kubernetes.
 
 ## Directory Structure
 
@@ -10,35 +11,39 @@ argocd/
 ├── bootstrap/
 │   └── Argo CD installation configuration
 ├── projects/
-│   └── Argo CD AppProject definitions
-└── applications/
-    └── Argo CD Application definitions
+│   └── AppProject definitions
+├── applications/
+│   └── Application definitions
+├── kustomization.yaml
+└── README.md
 ```
 
 ## Bootstrap Model
 
 Argo CD must exist before it can reconcile resources from Git.
 
-For this reason, the initial Argo CD installation is performed manually
-using the manifests stored under `bootstrap/`.
+The initial Argo CD installation is therefore bootstrapped using configuration stored under:
 
-After bootstrap, application deployment and lifecycle management are
-handled declaratively through Argo CD.
+```text
+argocd/bootstrap/
+```
 
-The local environment uses the non-HA Argo CD installation because it is
-intended for development and integration testing.
+The local environment uses a non-HA installation because it is intended for development, integration testing and platform validation.
 
-The Argo CD version is explicitly pinned to provide reproducible
-installations.
+The Argo CD version is explicitly pinned to keep bootstrap behaviour reproducible.
+
+After bootstrap, application and platform workload lifecycle is managed declaratively through Git.
 
 ## Bootstrap
 
-Render the manifests:
+Render the bootstrap configuration:
+
 ```bash
 kubectl kustomize argocd/bootstrap
 ```
 
 Install Argo CD:
+
 ```bash
 kubectl apply \
   --server-side \
@@ -50,8 +55,220 @@ Verify:
 
 ```bash
 kubectl get pods -n argocd
-kubectl get applications.argoproj.io -n argocd
 ```
+
+## GitOps Hierarchy
+
+The local GitOps hierarchy follows an app-of-apps model:
+
+```text
+platform-root
+├── AppProjects
+└── child Applications
+    ├── Online Boutique
+    ├── Metrics
+    ├── Logging
+    └── Tracing
+```
+
+The root Application represents the GitOps bootstrap boundary.
+
+After Argo CD is installed, `platform-root` reconciles:
+
+* Argo CD projects
+* active child Applications
+
+Child Applications then reconcile their respective workloads.
+
+## Automated Reconciliation
+
+Managed Applications use automated GitOps reconciliation.
+
+The reconciliation loop is:
+
+```text
+Git desired state
+        ↓
+     Argo CD
+        ↓
+     Compare
+        ↓
+    OutOfSync
+        ↓
+  Automatic Sync
+        ↓
+    Kubernetes
+        ↓
+ Synced/Healthy
+```
+
+Applications can use:
+
+* automated synchronization
+* automatic pruning
+* automatic self-healing
+* namespace creation
+* controlled prune ordering
+
+Manual changes to Argo CD-managed resources are treated as configuration drift and may be reverted automatically.
+
+Changes to managed resources should therefore be introduced through Git.
+
+## Resource Ownership
+
+Argo CD owns the lifecycle of managed application resources.
+
+Do not use the following commands to change desired state:
+
+```text
+helm install
+helm upgrade
+kubectl apply
+kubectl edit
+kubectl scale
+```
+
+for resources managed by Argo CD.
+
+Operational inspection remains appropriate through commands such as:
+
+```text
+kubectl get
+kubectl describe
+kubectl logs
+kubectl exec
+kubectl port-forward
+```
+
+## Local Workload Activation
+
+The local environment uses an explicit activation mechanism so that not every platform component must run continuously.
+
+Active Applications are declared in:
+
+```text
+argocd/kustomization.yaml
+```
+
+For example:
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - applications/online-boutique-local.yaml
+  - applications/observability-metrics-local.yaml
+  - applications/observability-opentelemetry-local.yaml
+  - applications/observability-jaeger-local.yaml
+```
+
+Only Applications referenced by this Kustomization are reconciled by the root Application.
+
+Definitions stored under:
+
+```text
+argocd/applications/
+```
+
+represent available Applications, not necessarily active workloads.
+
+```text
+available Applications
+           ↓
+ argocd/applications/
+
+  active Applications
+           ↓
+argocd/kustomization.yaml
+```
+
+## Enabling a Workload
+
+To enable a workload, add its Application manifest to:
+
+```text
+argocd/kustomization.yaml
+```
+
+After the change is merged, `platform-root` detects the updated desired state and creates the corresponding child Application.
+
+The child Application then deploys its managed resources.
+
+## Disabling a Workload
+
+To disable a workload, remove its Application manifest from:
+
+```text
+argocd/kustomization.yaml
+```
+
+The root Application uses pruning, so the removed child Application is deleted.
+
+Child Applications use the Argo CD resource finalizer:
+
+```yaml
+finalizers:
+  - resources-finalizer.argocd.argoproj.io
+```
+
+This provides cascading deletion of resources managed by the removed Application.
+
+```text
+remove Application from kustomization
+                  ↓
+             Git change
+                  ↓
+            platform-root
+                  ↓
+                prune
+                  ↓
+      child Application removed
+                  ↓
+      managed resources removed
+```
+
+This keeps workload activation fully declarative and Git-driven.
+
+## Resource-Constrained Local Profiles
+
+The activation model allows different platform combinations to be used depending on the task being performed.
+
+Typical profiles include:
+
+```text
+Core
+├── Online Boutique
+└── Argo CD
+```
+
+```text
+Metrics
+├── Online Boutique
+├── Argo CD
+├── Prometheus
+└── Grafana
+```
+
+```text
+Logging
+├── Online Boutique
+├── Argo CD
+├── Prometheus/Grafana
+├── Loki
+└── Alloy
+```
+
+```text
+Tracing
+├── Online Boutique
+├── Argo CD
+├── Prometheus/Grafana
+├── OpenTelemetry Collector
+└── Jaeger
+```
+
+A full platform profile can still be enabled temporarily for end-to-end CI/CD, GitOps and observability validation.
 
 ## Access
 
@@ -64,301 +281,36 @@ kubectl port-forward \
   8081:443
 ```
 
-The UI is then available at: <https://localhost:8081>
-
-Application configuration is introduced separately and is managed using
-declarative `Application` and `AppProject` resources.
-
-## Online Boutique Application
-
-The local Online Boutique deployment is managed through a declarative
-Argo CD `Application`.
-
-The Application uses:
-
-- the `online-boutique` AppProject
-- the Online Boutique Helm chart stored in this repository
-- environment-specific values from `environments/local`
-- the local Kubernetes cluster as the deployment destination
-- the `online-boutique` namespace
-
-Argo CD uses Helm to render Kubernetes manifests while Argo CD manages
-the application lifecycle.
-
-The local Application initially uses manual synchronization so changes
-can be reviewed before they are applied to the cluster.
-
-## Deployment Workflow
-
-Changes to the application deployment configuration follow this flow:
+The UI is then available at:
 
 ```text
-Git commit
-    ↓
-Git repository
-    ↓
-Argo CD comparison
-    ↓
-OutOfSync
-    ↓
-Manual Sync
-    ↓
-Kubernetes
-    ↓
-Synced / Healthy
+https://localhost:8081
 ```
 
-Automated synchronization, pruning and self-healing are introduced
-separately after the manual reconciliation workflow has been validated.
+## Validation
 
-## Automated Reconciliation
-
-The local Online Boutique Application uses automated GitOps
-reconciliation.
-
-Argo CD continuously compares the desired state stored in Git with the
-actual state running in Kubernetes.
-
-The Application enables:
-
-- automated synchronization
-- automatic pruning of resources removed from Git
-- automatic self-healing of cluster drift
-- namespace creation
-- pruning after successful resource synchronization
-
-The reconciliation model is:
-
-```text
-Git desired state
-      ↓
-Argo CD
-      ↓
-Compare
-      ↓
-OutOfSync
-      ↓
-Automatic Sync
-      ↓
-Kubernetes
-      ↓
-Synced / Healthy
-```
-
-Manual changes to Argo CD-managed application resources are considered
-configuration drift and may be automatically reverted.
-
-Application lifecycle changes should therefore be introduced through Git
-rather than through direct `kubectl apply`, `kubectl edit` or Helm CLI
-operations.
-
-### Resource Ownership
-
-Online Boutique workload lifecycle is owned by Argo CD.
-
-For managed application resources:
-
-Do not use:
-
-- `helm install`
-- `helm upgrade`
-- `kubectl apply`
-- `kubectl edit`
-
-Use Git changes and Argo CD reconciliation instead.
-
-`kubectl` remains appropriate for operational inspection and
-troubleshooting, including:
-
-- `kubectl get`
-- `kubectl describe`
-- `kubectl logs`
-- `kubectl exec`
-- `kubectl port-forward`
-
-## GitOps Hierarchy
-
-```text
-platform-root
-├── online-boutique AppProject
-└── online-boutique-local Application
-    └── Online Boutique Helm workloads
-```
-
-### Explanation:
-
-The root Application is the bootstrap boundary of the GitOps model.
-After Argo CD is installed, the root Application reconciles Argo CD
-projects and child Applications directly from Git.
-
-Child Applications then reconcile application workloads.
-
-## Local Workload Activation
-
-The local platform uses an explicit workload activation mechanism to control which Argo CD Applications are deployed at a given time.
-
-This is particularly important for the local environment, where running all observability and DevSecOps components simultaneously may exceed the available workstation resources.
-
-Active applications are declared in:
-`argocd/kustomization.yaml`
-
-Example:
-
-```yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - applications/online-boutique-local.yaml
-  - applications/observability-metrics-local.yaml
-  - applications/observability-opentelemetry-local.yaml
-  - applications/observability-jaeger-local.yaml
-```
-
-Only Applications referenced by this Kustomization are reconciled by the root Argo CD Application.
-
-Application definitions remain available under:
-`argocd/applications/`
-but a definition stored in that directory does not automatically mean that the workload is active.
-
-This separates:
-
-```text
-available applications
-        ↓
-argocd/applications/
-
-active applications
-        ↓
-argocd/kustomization.yaml
-```
-
-### Enabling a Workload
-
-To enable an application, add its manifest to the `resources` list.
-
-For example, to enable centralized logging:
-
-```yaml
-resources:
-  - applications/online-boutique-local.yaml
-  - applications/observability-metrics-local.yaml
-  - applications/observability-loki-local.yaml
-  - applications/observability-alloy-local.yaml
-```
-
-After the change is merged, the root Application detects the updated Kustomize output and creates the required child Applications.
-
-### Disabling a Workload
-
-To disable a platform layer, remove its Application manifests from the resources list.
-
-For example, to disable logging:
-
-```yaml
-resources:
-  - applications/online-boutique-local.yaml
-  - applications/observability-metrics-local.yaml
-```
-
-The root Application uses automated pruning, so removed child Applications are deleted.
-
-Child Applications use:
-
-```yaml
-finalizers:
-  - resources-finalizer.argocd.argoproj.io
-```
-
-This enables cascading deletion of resources managed by the removed Application.
-
-The resulting flow is:
-
-```text
-remove Application from Kustomization
-                ↓
-         Git change merged
-                ↓
-            platform-root
-                ↓
-              prune
-                ↓
-        child Application deleted
-                ↓
-managed Kubernetes resources deleted
-```
-
-### Why Manual Scaling Is Avoided
-
-Manual changes such as:
-
-```bash
-kubectl scale deployment <deployment> --replicas=0
-```
-
-are not used as a workload control mechanism.
-
-Active Applications have Argo CD self-healing enabled, so manual changes are treated as configuration drift and reverted to the desired state stored in Git.
-
-Workload activation therefore remains fully declarative and Git-driven.
-
-### Resource-Constrained Profiles
-
-The activation mechanism allows the local platform to run different workload combinations depending on the current development task.
-
-Examples include:
-
-```text
-Core
-├── Online Boutique
-└── Argo CD
-
-Metrics
-├── Online Boutique
-├── Argo CD
-├── Prometheus
-└── Grafana
-
-Logging
-├── Online Boutique
-├── Argo CD
-├── Prometheus/Grafana
-├── Loki
-└── Alloy
-
-Tracing
-├── Online Boutique
-├── Argo CD
-├── Prometheus/Grafana
-├── OpenTelemetry Collector
-└── Jaeger
-```
-
-A full platform profile can still be activated temporarily for end-to-end validation and demonstrations.
-
-#### Validation
-
-Render the currently active Application set locally:
+Render the active Argo CD configuration:
 
 ```bash
 kubectl kustomize argocd
 ```
 
-Verify Argo CD Applications:
+Verify Applications:
 
 ```bash
 kubectl get applications -n argocd
 ```
 
-Force the root Application to refresh after a Git change:
+Refresh the root Application when required during troubleshooting:
 
 ```bash
 argocd app get platform-root --refresh
 ```
 
-Verify that disabled Applications are removed:
+Verify managed workloads:
 
 ```bash
-kubectl get applications -n argocd
+kubectl get pods -A
 ```
 
-Verify that their managed workloads are also removed from the corresponding namespaces.
+Normal application lifecycle changes should not require manual Argo CD refreshes; reconciliation is expected to occur automatically.
