@@ -6,6 +6,26 @@ This repository contains the declarative deployment configuration consumed by Ar
 
 Application source code, artifact creation, infrastructure provisioning and Kubernetes desired state are intentionally maintained in separate repositories.
 
+## Table of Contents
+
+- [Responsibilities](#responsibilities)
+- [GitOps Model](#gitops-model)
+- [End-to-End Delivery Flow](#end-to-end-delivery-flow)
+- [Repository Structure](#repository-structure)
+- [Argo CD](#argo-cd)
+- [Online Boutique](#online-boutique)
+- [Environment Configuration](#environment-configuration)
+- [Container Images](#container-images)
+- [Artifact Promotion](#artifact-promotion)
+- [Promotion Catalog](#promotion-catalog)
+- [Promotion Workflow](#promotion-workflow)
+- [Local Workload Activation](#local-workload-activation)
+- [Observability](#observability)
+- [Security Model](#security-model)
+- [Validation](#validation)
+- [Documentation](#documentation)
+- [Design Principles](#design-principles)
+
 ## Responsibilities
 
 This repository owns:
@@ -152,7 +172,7 @@ Child Applications then reconcile their respective Helm-based workloads.
 
 Argo CD-managed resources use automated synchronization, pruning and self-healing.
 
-Detailed Argo CD behaviour is documented in: [argocd/README.md](argocd/README.md)
+Detailed Argo CD bootstrap, reconciliation and workload activation behaviour is documented in: [Argo CD documentation](argocd/README.md)
 
 
 ## Online Boutique
@@ -175,8 +195,8 @@ The chart defines:
 * distributed tracing configuration
 * container image configuration
 
-Detailed chart behaviour is documented in:
-[chart/README.md](applications/online-boutique/chart/README.md)
+Detailed Helm chart configuration and behaviour is documented in:
+[Online Boutique Helm Chart](applications/online-boutique/chart/README.md)
 
 ## Environment Configuration
 
@@ -376,11 +396,8 @@ The local environment supports GitOps-managed:
 
 The stack is intentionally modular so metrics, logging and tracing can be enabled independently depending on the development scenario.
 
-Detailed configuration is documented in:
-
-```text
-environments/local/observability/README.md
-```
+Metrics, logging and tracing architecture is documented in:
+[Local Observability](environments/local/observability/README.md)
 
 ## Security Model
 
@@ -423,6 +440,23 @@ Render the active Argo CD configuration:
 ```bash
 kubectl kustomize argocd
 ```
+
+## Documentation
+
+The repository documentation is organized by responsibility.
+
+| Area | Documentation |
+|---|---|
+| GitOps overview and artifact promotion | This README |
+| Argo CD bootstrap and reconciliation | [argocd/README.md](argocd/README.md) |
+| Online Boutique Helm chart | [applications/online-boutique/chart/README.md](applications/online-boutique/chart/README.md) |
+| Local observability architecture | [environments/local/observability/README.md](environments/local/observability/README.md) |
+
+The root README describes repository-level architecture and ownership.
+
+Component README files document implementation and configuration details specific to their respective areas.
+
+Operational troubleshooting should remain separate from architecture-level documentation as dedicated runbooks are introduced.
 
 ## Design Principles
 

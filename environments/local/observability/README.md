@@ -12,6 +12,25 @@ The stack provides:
 
 All components are deployed declaratively through Argo CD using upstream Helm charts and local values stored in this repository.
 
+## Table of Contents
+
+- [Architecture](#architecture)
+- [GitOps Deployment Model](#gitops-deployment-model)
+- [Metrics](#metrics)
+- [Logging](#logging)
+  - [Loki](#loki)
+  - [Grafana Alloy](#grafana-alloy)
+- [Distributed Tracing](#distributed-tracing)
+  - [OpenTelemetry Collector](#opentelemetry-collector)
+  - [Jaeger](#jaeger)
+- [Grafana](#grafana)
+- [Argo CD Sync Order](#argo-cd-sync-order)
+- [Local Workload Activation](#local-workload-activation)
+- [Resource-Constrained Local Profile](#resource-constrained-local-profile)
+- [Storage Model](#storage-model)
+- [Quick Validation](#quick-validation)
+- [Related Documentation](#related-documentation)
+
 ## Architecture
 
 ```text
@@ -386,6 +405,12 @@ kubectl port-forward \
   16686:16686
 ```
 
-Detailed troubleshooting commands and telemetry queries are maintained separately from this architecture-level README as the operational runbook grows.
+## Related Documentation
 
-Find it here: [README.md](https://github.com/matmajk/devsecops-gcp-infrastructure/blob/master/docs/runbooks/README.md)
+For the overall GitOps architecture, see the [GitOps repository README](../../../README.md).
+
+For Argo CD Application lifecycle, sync behaviour and workload activation, see the [Argo CD documentation](../../../argocd/README.md).
+
+For application tracing configuration, see the [Online Boutique Helm Chart](../../../applications/online-boutique/chart/README.md).
+
+Detailed troubleshooting procedures should be maintained separately from this architecture-level README as operational runbooks are introduced.
