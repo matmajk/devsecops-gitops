@@ -5,15 +5,10 @@ metadata:
   namespace: argocd
 spec:
   project: default
-  sources:
+  source:
     - repoURL: https://github.com/matmajk/devsecops-gitops.git
       targetRevision: master
-      path: argocd/projects
-      directory:
-        recurse: true
-    - repoURL: https://github.com/matmajk/devsecops-gitops.git
-      targetRevision: master
-      path: argocd
+      path: argocd/local
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
