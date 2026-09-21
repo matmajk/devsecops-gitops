@@ -4,34 +4,82 @@ This directory contains the Argo CD configuration used to manage workloads in th
 
 Argo CD provides the reconciliation layer between the desired state stored in Git and the workloads running in Kubernetes.
 
+The configuration is separated between the local Kind environment and the GCP/GKE environment.
+
 ## Table of Contents
 
-- [Directory Structure](#directory-structure)
-- [Bootstrap Model](#bootstrap-model)
-- [Bootstrap](#bootstrap)
-- [GitOps Hierarchy](#gitops-hierarchy)
-- [Automated Reconciliation](#automated-reconciliation)
-- [Resource Ownership](#resource-ownership)
-- [Local Workload Activation](#local-workload-activation)
-  - [Enabling a Workload](#enabling-a-workload)
-  - [Disabling a Workload](#disabling-a-workload)
-- [Resource-Constrained Local Profiles](#resource-constrained-local-profiles)
-- [Access](#access)
-- [Validation](#validation)
-- [Related Documentation](#related-documentation)
+* [Directory Structure](#directory-structure)
+* [Bootstrap Model](#bootstrap-model)
+* [GitOps Hierarchy](#gitops-hierarchy)
+* [Automated Reconciliation](#automated-reconciliation)
+* [Resource Ownership](#resource-ownership)
+* [Local Workload Activation](#local-workload-activation)
+
+  * [Enabling a Workload](#enabling-a-workload)
+  * [Disabling a Workload](#disabling-a-workload)
+* [Resource-Constrained Local Profiles](#resource-constrained-local-profiles)
+* [GCP Environment](#gcp-environment)
+* [Access](#access)
+* [Validation](#validation)
+* [Related Documentation](#related-documentation)
 
 ## Directory Structure
 
 ```text
 argocd/
 ├── bootstrap/
-│   └── Argo CD installation configuration
-├── projects/
-│   └── AppProject definitions
-├── applications/
-│   └── Application definitions
-├── kustomization.yaml
+│   ├── kustomization.yaml
+│   ├── namespace.yaml
+│   ├── root-application.yaml
+│   ├── platform-bootstrap-gcp-project.yaml
+│   └── platform-root-gcp.yaml
+│
+├── local/
+│   ├── applications/
+│   │   ├── kustomization.yaml
+│   │   ├── online-boutique.yaml
+│   │   ├── observability-alloy.yaml
+│   │   ├── observability-jaeger.yaml
+│   │   ├── observability-loki.yaml
+│   │   ├── observability-metrics.yaml
+│   │   └── observability-opentelemetry.yaml
+│   ├── projects/
+│   │   ├── kustomization.yaml
+│   │   ├── online-boutique.yaml
+│   │   └── observability.yaml
+│   └── kustomization.yaml
+│
+├── gcp/
+│   ├── applications/
+│   │   ├── kustomization.yaml
+│   │   └── online-boutique.yaml
+│   ├── projects/
+│   │   ├── kustomization.yaml
+│   │   ├── default.yaml
+│   │   └── online-boutique.yaml
+│   ├── kustomization.yaml
+│   └── README.md
+│
 └── README.md
+```
+
+Environment-specific Argo CD desired state is isolated under:
+
+```text
+argocd/local/
+argocd/gcp/
+```
+
+Reusable workload definitions remain outside this directory under:
+
+```text
+applications/
+```
+
+Environment-specific Helm values are stored under:
+
+```text
+environments/
 ```
 
 ## Bootstrap Model
@@ -44,34 +92,42 @@ The initial Argo CD installation is therefore bootstrapped using configuration s
 argocd/bootstrap/
 ```
 
-The local environment uses a non-HA installation because it is intended for development, integration testing and platform validation.
-
-The Argo CD version is explicitly pinned to keep bootstrap behaviour reproducible.
-
 After bootstrap, application and platform workload lifecycle is managed declaratively through Git.
 
-## Bootstrap
+### Local
 
-Render the bootstrap configuration:
+The local root Application is:
 
-```bash
-kubectl kustomize argocd/bootstrap
+```text
+argocd/bootstrap/root-application.yaml
 ```
 
-Install Argo CD:
+It reconciles:
 
-```bash
-kubectl apply \
-  --server-side \
-  --force-conflicts \
-  -k argocd/bootstrap
+```text
+argocd/local/
 ```
 
-Verify:
+The local environment uses a non-HA Argo CD installation because it is intended for development, integration testing and platform validation.
 
-```bash
-kubectl get pods -n argocd
+### GCP
+
+The GCP environment uses a separate restricted bootstrap project and root Application:
+
+```text
+argocd/bootstrap/platform-bootstrap-gcp-project.yaml
+argocd/bootstrap/platform-root-gcp.yaml
 ```
+
+The GCP root reconciles:
+
+```text
+argocd/gcp/
+```
+
+This keeps the local and GCP desired states independent.
+
+The Argo CD version is explicitly pinned to keep bootstrap behaviour reproducible.
 
 ## GitOps Hierarchy
 
@@ -79,20 +135,33 @@ The local GitOps hierarchy follows an app-of-apps model:
 
 ```text
 platform-root
-├── AppProjects
-└── child Applications
-    ├── Online Boutique
-    ├── Metrics
-    ├── Logging
-    └── Tracing
+      ↓
+argocd/local
+      │
+      ├── AppProjects
+      │
+      └── Applications
+          ├── Online Boutique
+          ├── Metrics
+          ├── Loki
+          ├── Alloy
+          ├── OpenTelemetry Collector
+          └── Jaeger
 ```
 
-The root Application represents the GitOps bootstrap boundary.
+The GCP environment uses a separate root:
 
-After Argo CD is installed, `platform-root` reconciles:
+```text
+platform-root-gcp
+      ↓
+argocd/gcp
+      │
+      ├── AppProjects
+      └── Applications
+          └── Online Boutique
+```
 
-* Argo CD projects
-* active child Applications
+Root Applications represent the GitOps bootstrap boundary.
 
 Child Applications then reconcile their respective workloads.
 
@@ -115,7 +184,7 @@ Git desired state
         ↓
     Kubernetes
         ↓
- Synced/Healthy
+  Synced/Healthy
 ```
 
 Applications can use:
@@ -134,7 +203,7 @@ Changes to managed resources should therefore be introduced through Git.
 
 Argo CD owns the lifecycle of managed application resources.
 
-Do not use the following commands to change desired state:
+Do not use the following commands to change desired state for resources managed by Argo CD:
 
 ```text
 helm install
@@ -143,8 +212,6 @@ kubectl apply
 kubectl edit
 kubectl scale
 ```
-
-for resources managed by Argo CD.
 
 Operational inspection remains appropriate through commands such as:
 
@@ -156,6 +223,10 @@ kubectl exec
 kubectl port-forward
 ```
 
+Infrastructure provisioning remains outside Argo CD ownership.
+
+Terraform manages GCP infrastructure and GKE, while Argo CD manages Kubernetes workloads.
+
 ## Local Workload Activation
 
 The local environment uses an explicit activation mechanism so that not every platform component must run continuously.
@@ -163,60 +234,57 @@ The local environment uses an explicit activation mechanism so that not every pl
 Active Applications are declared in:
 
 ```text
-argocd/kustomization.yaml
+argocd/local/applications/kustomization.yaml
 ```
 
-For example:
+The current Application set is:
 
 ```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - applications/online-boutique-local.yaml
-  - applications/observability-metrics-local.yaml
-  - applications/observability-opentelemetry-local.yaml
-  - applications/observability-jaeger-local.yaml
+  - online-boutique.yaml
+  - observability-alloy.yaml
+  - observability-jaeger.yaml
+  - observability-loki.yaml
+  - observability-metrics.yaml
+  - observability-opentelemetry.yaml
 ```
 
-Only Applications referenced by this Kustomization are reconciled by the root Application.
-
-Definitions stored under:
+The environment root:
 
 ```text
-argocd/applications/
+argocd/local/kustomization.yaml
 ```
 
-represent available Applications, not necessarily active workloads.
+aggregates both:
 
 ```text
-available Applications
-           ↓
- argocd/applications/
-
-  active Applications
-           ↓
-argocd/kustomization.yaml
+projects/
+applications/
 ```
 
-## Enabling a Workload
+Only Applications referenced by the local Applications Kustomization are reconciled by the root Application.
+
+### Enabling a Workload
 
 To enable a workload, add its Application manifest to:
 
 ```text
-argocd/kustomization.yaml
+argocd/local/applications/kustomization.yaml
 ```
 
 After the change is merged, `platform-root` detects the updated desired state and creates the corresponding child Application.
 
 The child Application then deploys its managed resources.
 
-## Disabling a Workload
+### Disabling a Workload
 
 To disable a workload, remove its Application manifest from:
 
 ```text
-argocd/kustomization.yaml
+argocd/local/applications/kustomization.yaml
 ```
 
 The root Application uses pruning, so the removed child Application is deleted.
@@ -231,17 +299,17 @@ finalizers:
 This provides cascading deletion of resources managed by the removed Application.
 
 ```text
-remove Application from kustomization
-                  ↓
+remove Application from Kustomization
+                 ↓
              Git change
-                  ↓
-            platform-root
-                  ↓
-                prune
-                  ↓
+                 ↓
+           platform-root
+                 ↓
+               prune
+                 ↓
       child Application removed
-                  ↓
-      managed resources removed
+                 ↓
+       managed resources removed
 ```
 
 This keeps workload activation fully declarative and Git-driven.
@@ -286,9 +354,46 @@ Tracing
 
 A full platform profile can still be enabled temporarily for end-to-end CI/CD, GitOps and observability validation.
 
+## GCP Environment
+
+The GCP environment uses an independent Argo CD desired-state root:
+
+```text
+argocd/gcp/
+```
+
+The initial GCP configuration manages Online Boutique on GKE.
+
+The same reusable Helm chart is used by both environments:
+
+```text
+applications/online-boutique/chart/
+```
+
+with separate environment values:
+
+```text
+environments/local/online-boutique/values.yaml
+environments/gcp/online-boutique/values.yaml
+```
+
+The GCP configuration also introduces a more restrictive AppProject model.
+
+The `default` project is configured as deny-all, while the Online Boutique project is restricted to:
+
+* the GitOps repository
+* the `online-boutique` namespace
+* required Kubernetes resource kinds
+
+Detailed GCP bootstrap and permission configuration is documented in:
+
+```text
+argocd/gcp/README.md
+```
+
 ## Access
 
-Forward the Argo CD API server locally:
+Forward the Argo CD API server:
 
 ```bash
 kubectl port-forward \
@@ -303,30 +408,72 @@ The UI is then available at:
 https://localhost:8081
 ```
 
-## Validation
-
-Render the active Argo CD configuration:
+When both local and GCP environments exist, verify the active Kubernetes context first:
 
 ```bash
-kubectl kustomize argocd
+kubectl config current-context
 ```
 
-Verify Applications:
+## Validation
+
+Render the local Argo CD configuration:
+
+```bash
+kubectl kustomize argocd/local
+```
+
+List local resources:
+
+```bash
+kubectl kustomize argocd/local \
+  | yq -r '[.kind, .metadata.name] | @tsv' \
+  | sort
+```
+
+Verify local Applications:
 
 ```bash
 kubectl get applications -n argocd
 ```
 
-Refresh the root Application when required during troubleshooting:
+Refresh the local root Application when required during troubleshooting:
 
 ```bash
 argocd app get platform-root --refresh
 ```
 
-Verify managed workloads:
+Render the GCP Argo CD configuration:
 
 ```bash
-kubectl get pods -A
+kubectl kustomize argocd/gcp
+```
+
+List GCP resources:
+
+```bash
+kubectl kustomize argocd/gcp \
+  | yq -r '[.kind, .metadata.name] | @tsv'
+```
+
+The GCP configuration should render:
+
+```text
+AppProject    default
+AppProject    online-boutique
+Application   online-boutique
+```
+
+After GCP bootstrap, verify:
+
+```bash
+kubectl get appprojects -n argocd
+kubectl get applications -n argocd
+```
+
+Managed Applications should converge to:
+
+```text
+Synced/Healthy
 ```
 
 Normal application lifecycle changes should not require manual Argo CD refreshes; reconciliation is expected to occur automatically.
@@ -334,6 +481,8 @@ Normal application lifecycle changes should not require manual Argo CD refreshes
 ## Related Documentation
 
 For repository-level GitOps architecture and artifact promotion, see the [GitOps repository README](../README.md).
+
+For detailed GCP Argo CD configuration, see [GCP Argo CD Environment](gcp/README.md).
 
 For the application managed by Argo CD, see the [Online Boutique Helm Chart](../applications/online-boutique/chart/README.md).
 

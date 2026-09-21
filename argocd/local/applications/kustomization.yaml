@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - online-boutique.yaml
+  - observability-alloy.yaml
+  - observability-jaeger.yaml
+  - observability-loki.yaml
+  - observability-metrics.yaml
+  - observability-opentelemetry.yaml

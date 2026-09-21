@@ -1,9 +1,0 @@
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - applications/online-boutique-local.yaml
-  - applications/observability-metrics-local.yaml
-#  - applications/observability-loki-local.yaml
-#  - applications/observability-alloy-local.yaml
-  - applications/observability-opentelemetry-local.yaml 
-  - applications/observability-jaeger-local.yaml
