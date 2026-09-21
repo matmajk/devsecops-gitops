@@ -9,13 +9,13 @@ spec:
   project: online-boutique
   sources:
     - repoURL: https://github.com/matmajk/devsecops-gitops.git
-      targetRevision: refs/heads/feat/gcp-gitops-environment
+      targetRevision: refs/heads/master
       path: applications/online-boutique/chart
       helm:
         valueFiles:
           - $values/environments/gcp/online-boutique/values.yaml
     - repoURL: https://github.com/matmajk/devsecops-gitops.git
-      targetRevision: refs/heads/feat/gcp-gitops-environment
+      targetRevision: refs/heads/master
       ref: values
   destination:
     server: https://kubernetes.default.svc
