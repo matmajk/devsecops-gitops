@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: online-boutique
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: online-boutique
+  sources:
+    - repoURL: https://github.com/matmajk/devsecops-gitops.git
+      targetRevision: refs/heads/feat/gcp-gitops-environment
+      path: applications/online-boutique/chart
+      helm:
+        valueFiles:
+          - $values/environments/gcp/online-boutique/values.yaml
+    - repoURL: https://github.com/matmajk/devsecops-gitops.git
+      targetRevision: refs/heads/feat/gcp-gitops-environment
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: online-boutique
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
