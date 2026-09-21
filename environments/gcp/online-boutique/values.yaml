@@ -7,7 +7,6 @@ loadGenerator:
 productCatalogService:
   replicaCount: 1
   image:
-    repository: "host.docker.internal:8082/online-boutique-docker-local"
-    tag: "ci-a939e885f27b6b3d01f403e0f76f844622cf7f02"
+    repository: "us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/productcatalogservice:v0.10.6"
   imagePullSecrets:
     - name: jfrog-registry
