@@ -23,6 +23,7 @@ Application source code, artifact creation, infrastructure provisioning and Kube
 - [Observability](#observability)
 - [Security Model](#security-model)
 - [Validation](#validation)
+- [Current Delivery State](#current-delivery-state)
 - [Documentation](#documentation)
 - [Design Principles](#design-principles)
 
@@ -120,24 +121,28 @@ This separation ensures that CI never requires direct deployment access to the c
 │           ├── values.schema.json
 │           └── README.md
 │
+├── environments/
+│   ├── local/
+│   │   ├── online-boutique/
+│   │   │   └── values.yaml
+│   │   └── observability/
+│   │       └── ...
+│   │
+│   └── gcp/
+│       └── online-boutique/
+│           └── values.yaml
+│
 ├── argocd/
 │   ├── bootstrap/
-│   ├── projects/
-│   ├── applications/
-│   ├── kustomization.yaml
-│   └── README.md
-│
-├── environments/
-│   └── local/
-│       ├── online-boutique/
-│       │   └── values.yaml
-│       └── observability/
-│           ├── kube-prometheus-stack-values.yaml
-│           ├── loki-values.yaml
-│           ├── alloy-values.yaml
-│           ├── opentelemetry-collector-values.yaml
-│           ├── jaeger-values.yaml
-│           └── README.md
+│   │   └── Argo CD bootstrap resources
+│   ├── local/
+│   │   ├── applications/
+│   │   ├── projects/
+│   │   └── kustomization.yaml
+│   └── gcp/
+│       ├── applications/
+│       ├── projects/
+│       └── kustomization.yaml
 │
 └── .github/
     ├── promotion/
@@ -146,34 +151,84 @@ This separation ensures that CI never requires direct deployment access to the c
         └── promote-artifact.yaml
 ```
 
-The base Helm chart defines reusable application defaults.
+The repository separates reusable workload definitions, environment-specific configuration and Argo CD reconciliation configuration.
 
-Environment directories contain only configuration that differs for a particular deployment environment.
+```text
+             applications/
+                   ↓
+     reusable workload definitions
+
+             environments/
+                   ↓
+    environment-specific Helm values
+
+                argocd/
+                   ↓
+environment-specific GitOps desired state
+```
+
+The Online Boutique Helm chart is shared between environments.
+
+Local and GCP deployments use separate values and separate Argo CD roots while reusing the same workload templates.
 
 ## Argo CD
 
-Argo CD manages the Kubernetes lifecycle of workloads defined in this repository.
+Argo CD reconciles the Kubernetes desired state stored in this repository.
 
-The local GitOps hierarchy is:
+Each Kubernetes environment has an isolated Argo CD root:
 
 ```text
-platform-root
-├── AppProjects
-└── Applications
-    ├── Online Boutique
-    ├── Metrics
-    ├── Logging
-    └── Tracing
+argocd/
+├── local/
+│   ├── projects/
+│   ├── applications/
+│   └── kustomization.yaml
+│
+└── gcp/
+    ├── projects/
+    ├── applications/
+    └── kustomization.yaml
 ```
 
-The root Application reconciles Argo CD projects and child Applications.
+The reconciliation paths are:
 
-Child Applications then reconcile their respective Helm-based workloads.
+```text
+Local Argo CD
+      ↓
+argocd/local
+      ↓
+local AppProjects + Applications
+```
 
-Argo CD-managed resources use automated synchronization, pruning and self-healing.
+and:
 
-Detailed Argo CD bootstrap, reconciliation and workload activation behaviour is documented in: [Argo CD documentation](argocd/README.md)
+```text
+GCP Argo CD
+      ↓
+argocd/gcp
+      ↓
+GCP AppProjects + Applications
+```
 
+Application workloads are not deployed directly by CI or Terraform.
+
+The ownership model is:
+
+```text
+Terraform
+    ↓
+GCP infrastructure + GKE
+
+GitOps repository
+    ↓
+Argo CD
+    ↓
+Kubernetes workloads
+```
+
+After initial Argo CD bootstrap, workload lifecycle changes are introduced through Git and reconciled by Argo CD.
+
+Detailed Argo CD configuration and bootstrap behaviour are documented in: [Argo CD configuration](argocd/README.md)
 
 ## Online Boutique
 
@@ -208,19 +263,48 @@ The local environment uses:
 environments/local/online-boutique/values.yaml
 ```
 
+and local observability configuration under:
+
+```text
+environments/local/observability/
+```
+
+The GCP environment uses:
+
+```text
+environments/gcp/online-boutique/values.yaml
+```
+
+Both environments reuse:
+
+```text
+applications/online-boutique/chart/
+```
+
 Environment values can override configuration such as:
 
-* replicas
+* enabled workloads
 * resource profiles
 * tracing configuration
 * container image repository
 * container image tag
 * image pull secret references
-* workload-specific settings
+* environment-specific runtime settings
 
-The current environment runs on a local Kind cluster.
+The environments currently serve different purposes:
 
-Future cloud environments can provide separate values while reusing the same base chart.
+```text
+Local
+├── Kind Kubernetes
+├── Online Boutique
+└── full local observability stack
+
+GCP
+├── GKE
+└── Online Boutique
+```
+
+Cloud observability is introduced separately rather than duplicating the full local observability stack during the initial GKE deployment.
 
 ## Container Images
 
@@ -385,16 +469,30 @@ Argo CD pruning and Application finalizers provide declarative cleanup when a wo
 
 ## Observability
 
-The local environment supports GitOps-managed:
+The local Kubernetes environment includes GitOps-managed observability components:
 
 * Prometheus
 * Grafana
 * Loki
-* Grafana Alloy
+* Alloy
 * OpenTelemetry Collector
 * Jaeger
 
-The stack is intentionally modular so metrics, logging and tracing can be enabled independently depending on the development scenario.
+Local observability Applications are maintained under:
+
+```text
+argocd/local/applications/
+```
+
+and their Helm configuration under:
+
+```text
+environments/local/observability/
+```
+
+The initial GCP GitOps environment does not duplicate the complete local observability stack.
+
+Its initial workload scope is intentionally limited to Online Boutique while cloud observability is introduced as a separate platform milestone.
 
 Metrics, logging and tracing architecture is documented in:
 [Local Observability](environments/local/observability/README.md)
@@ -441,6 +539,40 @@ Render the active Argo CD configuration:
 kubectl kustomize argocd
 ```
 
+## Current Delivery State
+
+The repository supports separate local and GCP GitOps deployment paths.
+
+The local path includes the full application and observability baseline:
+
+```text
+     Application CI
+           ↓
+Validated container image
+           ↓
+         JFrog
+           ↓
+ GitOps desired state
+           ↓
+        Argo CD
+           ↓
+    Kind Kubernetes
+```
+
+The GCP path reuses the same Online Boutique Helm chart with GCP-specific values and an isolated Argo CD configuration:
+
+```text
+GitOps Repository
+        ↓
+   GCP Argo CD
+        ↓
+ Online Boutique
+        ↓
+       GKE
+```
+
+The GCP Argo CD configuration uses dedicated AppProjects and an environment-specific root so local and cloud desired state remain isolated.
+
 ## Documentation
 
 The repository documentation is organized by responsibility.
@@ -464,11 +596,13 @@ The repository follows these principles:
 
 * Git is the source of truth for Kubernetes desired state.
 * CI does not deploy directly to Kubernetes.
-* Argo CD owns workload reconciliation.
-* Artifacts are built once and promoted without rebuilding.
-* Environment configuration is separated from reusable application defaults.
+* Terraform manages infrastructure rather than application workloads.
+* Argo CD is responsible for Kubernetes reconciliation.
+* Reusable Helm charts are shared across environments.
+* Environment-specific values are separated from application defaults.
+* Local and GCP Argo CD desired state use isolated environment roots.
+* AppProjects should follow least-privilege principles.
+* Container artifacts are built once and promoted without rebuilding.
 * Secrets and registry credentials are not committed to Git.
-* Promotion changes application versions rather than environment infrastructure.
-* Deployment configuration is validated before promotion is merged.
-* Shared promotion logic is preferred over workflow duplication.
-* Local workloads can be activated independently to control workstation resource consumption.
+* Promotion changes artifact versions rather than environment infrastructure.
+* Shared promotion logic is preferred over per-service workflow duplication.
