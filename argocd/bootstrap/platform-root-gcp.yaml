@@ -9,7 +9,7 @@ spec:
   project: platform-bootstrap-gcp
   source:
     repoURL: https://github.com/matmajk/devsecops-gitops.git
-    targetRevision: refs/heads/feat/gcp-gitops-environment
+    targetRevision: refs/heads/master
     path: argocd/gcp
   destination:
     server: https://kubernetes.default.svc
