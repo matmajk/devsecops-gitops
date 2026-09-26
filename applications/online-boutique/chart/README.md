@@ -1,18 +1,15 @@
 # Online Boutique Helm Chart
 
-Custom Helm chart used to deploy the Online Boutique microservices application as part of the DevSecOps platform.
+Reusable Helm chart for deploying Online Boutique workloads in the DevSecOps platform.
 
-The chart provides the reusable Kubernetes application definition, while environment-specific behaviour is supplied through separate values files.
+Environment-specific behaviour is supplied through separate values files rather than duplicated chart definitions.
 
 ## Table of Contents
 
 - [Workloads](#workloads)
 - [Chart Design](#chart-design)
-- [Shared Configuration](#shared-configuration)
 - [Security Defaults](#security-defaults)
-- [Service-Specific Configuration](#service-specific-configuration)
 - [Container Images](#container-images)
-- [Private Registry Authentication](#private-registry-authentication)
 - [Load Generation](#load-generation)
 - [Distributed Tracing](#distributed-tracing)
 - [Environment Model](#environment-model)
@@ -24,25 +21,25 @@ The chart provides the reusable Kubernetes application definition, while environ
 
 The chart currently defines:
 
-* frontend
-* productcatalogservice
-* currencyservice
-* recommendationservice
-* adservice
-* redis-cart
-* cartservice
-* shippingservice
-* paymentservice
-* emailservice
-* checkoutservice
-* loadgenerator
+- frontend
+- productcatalogservice
+- currencyservice
+- recommendationservice
+- adservice
+- redis-cart
+- cartservice
+- shippingservice
+- paymentservice
+- emailservice
+- checkoutservice
+- loadgenerator
 
-The application covers the complete Online Boutique purchase flow, including:
+The chart covers the core Online Boutique purchase flow:
 
 ```text
 Frontend
 └── Checkout Service
-    ├── Cart Service - Redis
+    ├── Cart Service ── Redis
     ├── Product Catalog
     ├── Currency Service
     ├── Payment Service
@@ -50,41 +47,30 @@ Frontend
     └── Email Service
 ```
 
-Redis uses ephemeral storage in the local environment and is intended for development and integration testing.
-
 ## Chart Design
 
-The chart separates configuration into:
+Shared application defaults are defined in `values.yaml`.
 
-```text
-shared application configuration
-             +
-service-specific configuration
-```
-
-Shared settings are centralized in `values.yaml` and reusable Helm helpers.
-
-Service-specific behaviour remains explicit where workloads have different operational requirements.
-
-## Shared Configuration
-
-Common configuration includes:
-
-* Kubernetes metadata
-* Pod security context
-* container security context
-* application image construction
-* distributed tracing configuration
-
-Reusable Helm logic is implemented in:
+Reusable rendering logic is implemented in:
 
 ```text
 templates/_helpers.tpl
 ```
 
+Service-specific behaviour remains explicit where workloads have different requirements, including:
+
+- ports
+- environment variables
+- dependencies
+- probes
+- resource requests and limits
+- storage configuration
+
+Deployment and Service selectors remain explicit and stable because `Deployment.spec.selector` is immutable.
+
 ## Security Defaults
 
-Common Pod security configuration includes non-root execution:
+The common Pod security baseline includes non-root execution:
 
 ```yaml
 global:
@@ -95,7 +81,7 @@ global:
     runAsUser: 1000
 ```
 
-Common container security configuration includes:
+Containers use restrictive defaults:
 
 ```yaml
 global:
@@ -108,29 +94,13 @@ global:
         - ALL
 ```
 
-These defaults provide a restrictive baseline for application workloads.
-
-## Service-Specific Configuration
-
-Configuration that reflects workload-specific behaviour remains defined per service.
-
-This includes:
-
-* container ports
-* Service ports
-* environment variables
-* service dependencies
-* readiness and liveness probes
-* resource requests and limits
-* storage configuration
-
-Deployment and Service selectors remain explicit and stable because `Deployment.spec.selector` is immutable after creation.
+Environment values may specialize runtime configuration but should not weaken these baseline controls without an explicit design decision.
 
 ## Container Images
 
 Application services use a shared image helper.
 
-Default images inherit:
+Default application images inherit:
 
 ```yaml
 global:
@@ -138,7 +108,7 @@ global:
   imageTag: "v0.10.6"
 ```
 
-A service can override its repository or tag when a separately built artifact must be deployed.
+Individual services can override the repository or tag.
 
 Example:
 
@@ -146,17 +116,17 @@ Example:
 productCatalogService:
   image:
     name: productcatalogservice
-    repository: "<registry>/online-boutique-docker-local"
+    repository: "<registry>/<repository>"
     tag: "ci-<git-sha>"
 ```
 
-If a service-specific repository or tag is not provided, the corresponding global value is used.
+If a service-specific repository or tag is empty, the corresponding global value is used.
 
-This makes it possible to deploy a validated CI artifact for a single service without changing unrelated workloads.
+This allows a validated artifact for one service to be deployed without changing the image source of unrelated workloads.
 
-## Private Registry Authentication
+### Registry Authentication
 
-Services can reference Kubernetes image pull secrets:
+The chart supports `imagePullSecrets` for registries that require Kubernetes-managed credentials:
 
 ```yaml
 productCatalogService:
@@ -164,15 +134,15 @@ productCatalogService:
     - name: jfrog-registry
 ```
 
-Registry credentials are not stored in Helm values or committed to Git.
+Credentials must not be stored in Helm values or committed to Git.
 
-The referenced Kubernetes Secret must exist in the workload namespace before the Pod is scheduled.
+The local JFrog integration uses a runtime-created Kubernetes Secret.
+
+The GCP stage configuration uses Google Artifact Registry and does not store registry credentials in Git.
 
 ## Load Generation
 
-The chart can optionally deploy the Online Boutique Load Generator.
-
-It uses Locust to generate application traffic against the frontend.
+The optional Load Generator uses Locust to generate traffic against the frontend.
 
 Example:
 
@@ -183,21 +153,15 @@ loadGenerator:
   rate: 1
 ```
 
-Load generation is useful for:
+It is useful for integration, observability, autoscaling and failure-testing scenarios.
 
-* integration testing
-* observability validation
-* tracing validation
-* autoscaling experiments
-* failure testing
-
-It can be disabled when workstation resources need to be conserved.
+Environment profiles can disable it when continuous load is unnecessary.
 
 ## Distributed Tracing
 
-The chart supports optional OpenTelemetry tracing for services that include tracing instrumentation in the Online Boutique application baseline.
+The chart supports optional OpenTelemetry tracing for services that include tracing instrumentation.
 
-Tracing is configured through environment values:
+Example:
 
 ```yaml
 global:
@@ -214,87 +178,76 @@ COLLECTOR_SERVICE_ADDR=<collector endpoint>
 OTEL_SERVICE_NAME=<service name>
 ```
 
-Tracing is enabled for supported services only:
+Tracing is currently supported for:
 
-* frontend
-* checkoutservice
-* currencyservice
-* emailservice
-* paymentservice
-* productcatalogservice
-* recommendationservice
+- frontend
+- checkoutservice
+- currencyservice
+- emailservice
+- paymentservice
+- productcatalogservice
+- recommendationservice
 
 Services without upstream tracing support remain unchanged.
 
-Tracing configuration is rendered through shared Helm helpers to avoid repeating identical environment configuration across Deployment templates.
-
 ## Environment Model
 
-The chart contains reusable application defaults.
+The chart is shared across environments.
 
-Environment-specific configuration is stored separately.
-
-For the local environment:
+Local:
 
 ```text
+applications/online-boutique/chart
+              +
 environments/local/online-boutique/values.yaml
 ```
 
-The effective deployment configuration is therefore:
+GCP stage:
 
 ```text
-base chart
-    +
-local values
-    ↓
-rendered Kubernetes manifests
+applications/online-boutique/chart
+              +
+environments/gcp/stage/online-boutique/values.yaml
 ```
 
-The local environment is deployed and reconciled by Argo CD.
+Argo CD owns workload lifecycle in both environments.
 
-Direct `helm install` or `helm upgrade` operations should not be used to manage the lifecycle of the Argo CD-managed deployment.
+Direct `helm install` or `helm upgrade` should not be used to manage an Argo CD-managed deployment.
 
 ## Values Schema
 
-The chart defines its configuration contract using:
+The chart contract is defined in:
 
 ```text
 values.schema.json
 ```
 
-Helm validates the merged values before rendering or deployment.
+Helm validates the merged configuration before rendering.
 
-The schema validates areas including:
+The schema covers areas including:
 
-* required workload configuration
-* configuration value types
-* replica counts
-* container and Service ports
-* Kubernetes Service types
-* image pull policies
-* global and service-specific image configuration
-* image pull secret references
-* dependency addresses
-* resource configuration
-* Pod security configuration
-* container security configuration
+- required workload configuration
+- value types
+- replica counts
+- ports and Service types
+- image configuration
+- image pull secret references
+- dependencies
+- resource configuration
+- Pod and container security configuration
 
-Unknown properties are rejected to detect configuration mistakes early.
+Unknown properties are rejected to catch configuration mistakes early.
 
 ## Validation
 
-Lint the chart:
+Local:
 
 ```bash
 helm lint \
   applications/online-boutique/chart \
   --strict \
   -f environments/local/online-boutique/values.yaml
-```
 
-Render the local environment:
-
-```bash
 helm template \
   online-boutique \
   applications/online-boutique/chart \
@@ -302,12 +255,24 @@ helm template \
   -f environments/local/online-boutique/values.yaml
 ```
 
-Both commands apply `values.schema.json` validation before producing the resulting manifests.
+GCP stage:
+
+```bash
+helm lint \
+  applications/online-boutique/chart \
+  --strict \
+  -f environments/gcp/stage/online-boutique/values.yaml
+
+helm template \
+  online-boutique \
+  applications/online-boutique/chart \
+  --namespace online-boutique \
+  -f environments/gcp/stage/online-boutique/values.yaml
+```
 
 ## Related Documentation
 
-For repository-level GitOps architecture and artifact promotion, see the [GitOps repository README](../../../README.md).
-
-For Argo CD reconciliation and workload ownership, see the [Argo CD documentation](../../../argocd/README.md).
-
-For local metrics, logging and tracing configuration, see [Local Observability](../../../environments/local/observability/README.md).
+- [GitOps Repository](../../../README.md)
+- [Argo CD](../../../argocd/README.md)
+- [GCP Argo CD Environment](../../../argocd/gcp/README.md)
+- [Local Observability](../../../environments/local/observability/README.md)

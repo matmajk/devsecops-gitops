@@ -13,7 +13,7 @@ spec:
       path: applications/online-boutique/chart
       helm:
         valueFiles:
-          - $values/environments/gcp/online-boutique/values.yaml
+          - $values/environments/gcp/stage/online-boutique/values.yaml
     - repoURL: https://github.com/matmajk/devsecops-gitops.git
       targetRevision: refs/heads/master
       ref: values

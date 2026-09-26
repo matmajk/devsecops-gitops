@@ -1,20 +1,20 @@
 # Local Argo CD Environment
 
-This directory contains the Argo CD desired-state configuration for the local Kind environment.
+This directory defines the Argo CD desired state used by the local Kind environment.
 
-It defines the local Argo CD Applications and AppProjects while reusing shared application definitions and local environment-specific configuration from the GitOps repository.
+It contains local AppProjects and Applications while reusing shared workload definitions and environment-specific configuration from the repository.
 
 ## Table of Contents
 
-* [Directory Structure](#directory-structure)
-* [Environment Scope](#environment-scope)
-* [Bootstrap](#bootstrap)
-* [Online Boutique Application](#online-boutique-application)
-* [Observability Applications](#observability-applications)
-* [AppProjects](#appprojects)
-* [Workload Activation](#workload-activation)
-* [Validation](#validation)
-* [Related Documentation](#related-documentation)
+- [Directory Structure](#directory-structure)
+- [Scope](#scope)
+- [Bootstrap](#bootstrap)
+- [Online Boutique](#online-boutique)
+- [Observability](#observability)
+- [AppProjects](#appprojects)
+- [Workload Activation](#workload-activation)
+- [Validation](#validation)
+- [Related Documentation](#related-documentation)
 
 ## Directory Structure
 
@@ -28,36 +28,32 @@ argocd/local/
 │   ├── observability-loki.yaml
 │   ├── observability-metrics.yaml
 │   └── observability-opentelemetry.yaml
-│
 ├── projects/
 │   ├── kustomization.yaml
 │   ├── online-boutique.yaml
 │   └── observability.yaml
-│
 ├── kustomization.yaml
 └── README.md
 ```
 
-The environment root is:
+The environment root:
 
 ```text
 argocd/local/kustomization.yaml
 ```
 
-It aggregates:
+aggregates:
 
 ```text
 projects/
 applications/
 ```
 
-This provides a single desired-state entry point for the local Argo CD root Application.
+## Scope
 
-## Environment Scope
+The local GitOps environment manages workloads running on the Kind cluster.
 
-The local GitOps environment manages the application and observability workloads running on the Kind cluster.
-
-The current scope includes:
+Current scope:
 
 ```text
 Online Boutique
@@ -68,26 +64,22 @@ OpenTelemetry Collector
 Jaeger
 ```
 
-The local environment uses shared application definitions where possible and keeps environment-specific configuration under:
+Environment-specific configuration is stored under:
 
 ```text
 environments/local/
 ```
 
-Local and GCP Argo CD configuration remain independent:
+Local and GCP desired state remain isolated:
 
 ```text
 argocd/local/
 argocd/gcp/
 ```
 
-This keeps local-only observability workloads separate from the initial GCP workload baseline.
-
 ## Bootstrap
 
-Argo CD must exist before it can reconcile this directory.
-
-The local root Application is defined in:
+The local Argo CD root Application is defined in:
 
 ```text
 argocd/bootstrap/root-application.yaml
@@ -99,7 +91,7 @@ It reconciles:
 argocd/local/
 ```
 
-The resulting hierarchy is:
+The hierarchy is:
 
 ```text
       platform-root
@@ -111,11 +103,9 @@ AppProjects + Applications
        Kind cluster
 ```
 
-The local environment uses a non-HA Argo CD installation because it is intended for development, integration testing and platform validation.
-
 After bootstrap, normal workload lifecycle is managed through Git and Argo CD.
 
-## Online Boutique Application
+## Online Boutique
 
 The local Online Boutique Application is defined in:
 
@@ -123,7 +113,7 @@ The local Online Boutique Application is defined in:
 argocd/local/applications/online-boutique.yaml
 ```
 
-It uses the shared Helm chart:
+It combines the shared chart:
 
 ```text
 applications/online-boutique/chart/
@@ -135,7 +125,7 @@ with local values:
 environments/local/online-boutique/values.yaml
 ```
 
-The Application deploys Online Boutique to the local Kubernetes cluster and the:
+The Application deploys to the:
 
 ```text
 online-boutique
@@ -143,13 +133,11 @@ online-boutique
 
 namespace.
 
-The same reusable Helm chart is also used by the GCP environment.
+The same Helm chart is reused by the GCP stage environment with separate values.
 
-## Observability Applications
+## Observability
 
-Local observability is split into dedicated Argo CD Applications.
-
-The current Application definitions are:
+Local observability is split into dedicated Argo CD Applications:
 
 ```text
 observability-metrics.yaml
@@ -159,74 +147,48 @@ observability-opentelemetry.yaml
 observability-jaeger.yaml
 ```
 
-Their environment-specific configuration is stored under:
+Their Helm values are stored under:
 
 ```text
 environments/local/observability/
 ```
 
-The observability stack provides:
-
-```text
-Metrics
-├── Prometheus
-└── Grafana
-
-Logging
-├── Loki
-└── Alloy
-
-Tracing
-├── OpenTelemetry Collector
-└── Jaeger
-```
-
-Keeping the components as separate Applications allows individual platform layers to be enabled or disabled declaratively when required.
-
-Detailed configuration is documented in:
+Detailed metrics, logging and tracing configuration is documented in:
 
 ```text
 environments/local/observability/README.md
 ```
 
+Keeping observability components as separate Applications allows individual layers to be enabled or disabled declaratively.
+
 ## AppProjects
 
-Local Applications are grouped into dedicated Argo CD AppProjects.
-
-The current projects are:
+Local workloads use dedicated AppProjects:
 
 ```text
 online-boutique
 observability
 ```
 
-Their definitions are stored under:
+Definitions are stored under:
 
 ```text
 argocd/local/projects/
 ```
 
-The Online Boutique project manages the application workload.
+The Online Boutique project owns application workloads.
 
-The observability project manages the metrics, logging and tracing Applications.
-
-Project definitions are included in:
-
-```text
-argocd/local/projects/kustomization.yaml
-```
-
-and are reconciled together with the local Applications through the environment root.
+The observability project owns metrics, logging and tracing Applications.
 
 ## Workload Activation
 
-Active local Applications are declared in:
+Active local Applications are selected through:
 
 ```text
 argocd/local/applications/kustomization.yaml
 ```
 
-The current Application set is:
+The current set is:
 
 ```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -241,27 +203,21 @@ resources:
   - observability-opentelemetry.yaml
 ```
 
-Removing an Application from this Kustomization removes it from the local desired state.
+Removing an Application from this file removes it from the local desired state.
 
-Adding an Application makes it part of the desired state reconciled by:
+Adding an Application makes it part of the desired state reconciled by `platform-root`.
 
-```text
-platform-root
-```
-
-This mechanism allows local platform components to be controlled declaratively without relying on manual scaling or direct Kubernetes changes.
-
-Because Argo CD uses pruning and self-healing, workload activation should be changed through Git.
+Manual `kubectl scale` is not used as a workload activation mechanism because Argo CD self-healing treats it as drift.
 
 ## Validation
 
-Render the complete local Argo CD desired state:
+Render the complete local desired state:
 
 ```bash
 kubectl kustomize argocd/local
 ```
 
-List the rendered resources:
+List rendered resources:
 
 ```bash
 kubectl kustomize argocd/local \
@@ -269,7 +225,7 @@ kubectl kustomize argocd/local \
   | sort
 ```
 
-The current configuration should include:
+Expected resources include:
 
 ```text
 Application    observability-alloy-local
@@ -282,27 +238,22 @@ AppProject     observability
 AppProject     online-boutique
 ```
 
-Verify the active Kubernetes context:
+Verify the active context before operating on the cluster:
 
 ```bash
 kubectl config current-context
 ```
 
-For the local environment, the expected context is:
+Expected local context:
 
 ```text
 kind-devsecops-local
 ```
 
-Verify Argo CD Applications:
+Verify Argo CD resources:
 
 ```bash
 kubectl get applications -n argocd
-```
-
-Verify AppProjects:
-
-```bash
 kubectl get appprojects -n argocd
 ```
 
@@ -312,20 +263,17 @@ Verify managed workloads:
 kubectl get pods -A
 ```
 
-Refresh the local root Application when required during troubleshooting:
+A manual root refresh is useful only for troubleshooting:
 
 ```bash
 argocd app get platform-root --refresh
 ```
 
-Normal application lifecycle changes should not require manual refreshes; reconciliation is expected to occur automatically.
+Normal lifecycle changes should reconcile automatically.
 
 ## Related Documentation
 
-For the overall Argo CD configuration and local/GCP environment structure, see the [Argo CD README](../README.md).
-
-For repository-level GitOps architecture and artifact promotion, see the [GitOps repository README](../../README.md).
-
-For the shared workload definition, see the [Online Boutique Helm Chart](../../applications/online-boutique/chart/README.md).
-
-For local metrics, logging and tracing configuration, see [Local Observability](../../environments/local/observability/README.md).
+- [Argo CD](../README.md)
+- [GitOps Repository](../../README.md)
+- [Online Boutique Helm Chart](../../applications/online-boutique/chart/README.md)
+- [Local Observability](../../environments/local/observability/README.md)

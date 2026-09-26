@@ -1,18 +1,18 @@
 # GCP Argo CD Environment
 
-This directory contains the Argo CD desired-state configuration for the GKE environment.
+This directory defines the Argo CD desired state used by the GKE stage environment.
 
-It defines the GCP-specific Argo CD Applications and AppProjects while reusing the shared Online Boutique Helm chart from the repository.
+It contains GCP-specific AppProjects and Applications while reusing the shared Online Boutique Helm chart.
 
 ## Table of Contents
 
-* [Directory Structure](#directory-structure)
-* [Environment Scope](#environment-scope)
-* [Bootstrap](#bootstrap)
-* [Online Boutique Application](#online-boutique-application)
-* [AppProject Security](#appproject-security)
-* [Validation](#validation)
-* [Related Documentation](#related-documentation)
+- [Directory Structure](#directory-structure)
+- [Scope](#scope)
+- [Bootstrap](#bootstrap)
+- [Online Boutique](#online-boutique)
+- [AppProject Security](#appproject-security)
+- [Validation](#validation)
+- [Related Documentation](#related-documentation)
 
 ## Directory Structure
 
@@ -21,79 +21,64 @@ argocd/gcp/
 ├── applications/
 │   ├── kustomization.yaml
 │   └── online-boutique.yaml
-│
 ├── projects/
 │   ├── kustomization.yaml
 │   ├── default.yaml
 │   └── online-boutique.yaml
-│
 ├── kustomization.yaml
 └── README.md
 ```
 
-The environment root is:
+The environment root:
 
 ```text
 argocd/gcp/kustomization.yaml
 ```
 
-It aggregates:
+aggregates:
 
 ```text
 projects/
 applications/
 ```
 
-The GCP root Application reconciles this directory as a single desired-state entry point.
+## Scope
 
-## Environment Scope
+The initial GCP GitOps scope is Online Boutique on GKE.
 
-The initial GCP GitOps environment manages Online Boutique on GKE.
-
-The workload uses the shared Helm chart:
+The Application combines:
 
 ```text
 applications/online-boutique/chart/
 ```
 
-with GCP-specific values:
+with:
 
 ```text
-environments/gcp/online-boutique/values.yaml
+environments/gcp/stage/online-boutique/values.yaml
 ```
 
-The complete local observability stack is not included in the initial GCP baseline.
+The stage values select the validated Product Catalog artifact from Google Artifact Registry.
 
-Local and GCP Argo CD configuration remain independent:
-
-```text
-argocd/local/
-argocd/gcp/
-```
-
-This prevents environment-specific Applications from being reconciled by the wrong cluster.
+The complete local observability stack is intentionally not duplicated in this initial GCP baseline.
 
 ## Bootstrap
 
-Argo CD must exist before it can reconcile this directory.
+Argo CD must exist before this directory can be reconciled.
 
-The GCP bootstrap uses:
+The GCP bootstrap boundary consists of:
 
 ```text
 argocd/bootstrap/platform-bootstrap-gcp-project.yaml
 argocd/bootstrap/platform-root-gcp.yaml
 ```
 
-After Argo CD itself is installed, apply the bootstrap project:
+After Argo CD itself is installed:
 
 ```bash
 kubectl apply \
   -f argocd/bootstrap/platform-bootstrap-gcp-project.yaml
-```
 
-Then create the GCP root Application:
-
-```bash
 kubectl apply \
   -f argocd/bootstrap/platform-root-gcp.yaml
 ```
@@ -110,49 +95,38 @@ AppProjects + Applications
            GKE
 ```
 
-After this bootstrap step, workload lifecycle is managed through Git and Argo CD.
+After bootstrap, Online Boutique lifecycle changes should be introduced through Git.
 
-Do not manually deploy Online Boutique with Helm or `kubectl apply`.
+## Online Boutique
 
-## Online Boutique Application
-
-The GCP Online Boutique Application is defined in:
+The GCP Application is defined in:
 
 ```text
 argocd/gcp/applications/online-boutique.yaml
 ```
 
-It combines:
+It deploys to the in-cluster Kubernetes API:
+
+```yaml
+destination:
+  server: https://kubernetes.default.svc
+  namespace: online-boutique
+```
+
+The Application uses the shared chart and stage-specific values:
 
 ```text
 applications/online-boutique/chart/
+environments/gcp/stage/online-boutique/values.yaml
 ```
 
-with:
-
-```text
-environments/gcp/online-boutique/values.yaml
-```
-
-The Application deploys to:
-
-```text
-server:
-  https://kubernetes.default.svc
-
-namespace:
-  online-boutique
-```
-
-The same Helm chart is reused by the local environment.
-
-Only environment-specific configuration is separated.
+The current stage configuration disables local tracing dependencies and does not use the local JFrog image pull secret.
 
 ## AppProject Security
 
 The GCP environment uses dedicated AppProjects.
 
-The `default` AppProject is configured as deny-all so Applications cannot use it as an unrestricted fallback.
+The `default` AppProject is configured as deny-all.
 
 Online Boutique uses:
 
@@ -162,12 +136,12 @@ argocd/gcp/projects/online-boutique.yaml
 
 The project is restricted to:
 
-* the GitOps repository
-* the in-cluster Kubernetes API
-* the `online-boutique` namespace
-* explicitly allowed Kubernetes resource kinds
+- the GitOps repository
+- the in-cluster Kubernetes API
+- the `online-boutique` namespace
+- explicitly allowed Kubernetes resource kinds
 
-The Helm chart directly manages:
+The chart currently renders:
 
 ```text
 Deployment
@@ -175,43 +149,21 @@ Service
 ServiceAccount
 ```
 
-The project also allows:
+The project also allows `ReplicaSet` and `Pod` for child-resource visibility in the Argo CD resource tree.
 
-```text
-ReplicaSet
-Pod
-```
+Permissions should be expanded only when the rendered workload requires additional kinds.
 
-to retain child-resource visibility in the Argo CD resource tree.
-
-The bootstrap root uses the separate:
-
-```text
-platform-bootstrap-gcp
-```
-
-AppProject.
-
-Its scope is limited to the GitOps repository, the `argocd` namespace and the Argo CD resource types required by the bootstrap hierarchy.
-
-Permissions should be expanded only when a concrete workload requirement exists.
+The GCP root uses the separate `platform-bootstrap-gcp` AppProject for bootstrap-level Argo CD resources.
 
 ## Validation
 
-Render the GCP Argo CD configuration:
+Render GCP Argo CD configuration:
 
 ```bash
 kubectl kustomize argocd/gcp
 ```
 
-List the rendered resources:
-
-```bash
-kubectl kustomize argocd/gcp \
-  | yq -r '[.kind, .metadata.name] | @tsv'
-```
-
-Expected resources:
+Expected resources include:
 
 ```text
 AppProject    default
@@ -219,20 +171,23 @@ AppProject    online-boutique
 Application   online-boutique
 ```
 
-Validate the GCP Helm values:
+Validate stage Helm values:
 
 ```bash
 helm lint \
   applications/online-boutique/chart \
-  -f environments/gcp/online-boutique/values.yaml
+  --strict \
+  -f environments/gcp/stage/online-boutique/values.yaml
 ```
 
-Inspect the resource kinds rendered by the chart:
+Inspect resource kinds rendered by the chart:
 
 ```bash
-helm template online-boutique \
+helm template \
+  online-boutique \
   applications/online-boutique/chart \
-  -f environments/gcp/online-boutique/values.yaml \
+  --namespace online-boutique \
+  -f environments/gcp/stage/online-boutique/values.yaml \
   | yq -r '
       select(.kind != null) |
       [.apiVersion, .kind] |
@@ -241,7 +196,7 @@ helm template online-boutique \
   | sort -u
 ```
 
-Expected kinds:
+Expected chart kinds:
 
 ```text
 apps/v1 Deployment
@@ -249,23 +204,10 @@ v1      Service
 v1      ServiceAccount
 ```
 
-After bootstrap, verify AppProjects:
+After GCP bootstrap:
 
 ```bash
 kubectl get appprojects -n argocd
-```
-
-Expected projects include:
-
-```text
-default
-online-boutique
-platform-bootstrap-gcp
-```
-
-Verify Applications:
-
-```bash
 kubectl get applications -n argocd
 ```
 
@@ -276,7 +218,7 @@ platform-root-gcp
 online-boutique
 ```
 
-Check the workload status:
+Check Online Boutique reconciliation:
 
 ```bash
 kubectl get application online-boutique \
@@ -284,20 +226,28 @@ kubectl get application online-boutique \
   -o jsonpath='{.status.sync.status}{" / "}{.status.health.status}{"\n"}'
 ```
 
-The target state is:
+Target:
 
 ```text
-Synced/Healthy
+Synced / Healthy
 ```
 
-The AppProject policy should also be validated with negative tests to confirm that unapproved resource kinds and deployment destinations are rejected.
+Verify the deployed Product Catalog image:
 
-Temporary validation manifests should not remain in the final desired state.
+```bash
+kubectl get deployment productcatalogservice \
+  -n online-boutique \
+  -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+```
+
+It should resolve to the expected immutable image in:
+
+```text
+europe-central2-docker.pkg.dev/devsecops-portfolio-matmajk/online-boutique/productcatalogservice:ci-<git-sha>
+```
 
 ## Related Documentation
 
-For the overall Argo CD configuration and local/GCP environment structure, see the [Argo CD README](../README.md).
-
-For repository-level GitOps architecture and artifact promotion, see the [GitOps repository README](../../README.md).
-
-For the shared workload definition, see the [Online Boutique Helm Chart](../../applications/online-boutique/chart/README.md).
+- [Argo CD](../README.md)
+- [GitOps Repository](../../README.md)
+- [Online Boutique Helm Chart](../../applications/online-boutique/chart/README.md)
