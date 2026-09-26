@@ -1,99 +1,53 @@
 # Local Observability
 
-This directory contains environment-specific configuration for the observability stack used by the local Kind-based DevSecOps platform.
+Environment-specific observability configuration for the local Kind-based DevSecOps platform.
 
-The stack provides:
-
-* Kubernetes and workload metrics
-* centralized application and platform logging
-* Kubernetes Events collection
-* distributed tracing
-* Grafana-based telemetry visualization
-
-All components are deployed declaratively through Argo CD using upstream Helm charts and local values stored in this repository.
+The local stack provides metrics, logs, Kubernetes Events and distributed tracing while keeping resource usage suitable for a development workstation.
 
 ## Table of Contents
 
 - [Architecture](#architecture)
-- [GitOps Deployment Model](#gitops-deployment-model)
-- [Metrics](#metrics)
-- [Logging](#logging)
-  - [Loki](#loki)
-  - [Grafana Alloy](#grafana-alloy)
-- [Distributed Tracing](#distributed-tracing)
-  - [OpenTelemetry Collector](#opentelemetry-collector)
-  - [Jaeger](#jaeger)
-- [Grafana](#grafana)
-- [Argo CD Sync Order](#argo-cd-sync-order)
-- [Local Workload Activation](#local-workload-activation)
-- [Resource-Constrained Local Profile](#resource-constrained-local-profile)
-- [Storage Model](#storage-model)
-- [Quick Validation](#quick-validation)
+- [Components](#components)
+- [GitOps Deployment](#gitops-deployment)
+- [Online Boutique Tracing](#online-boutique-tracing)
+- [Workload Activation](#workload-activation)
+- [Validation](#validation)
+- [Local Resource Profile](#local-resource-profile)
 - [Related Documentation](#related-documentation)
 
 ## Architecture
 
 ```text
-                         Online Boutique
-                               |
-              +----------------+----------------+
-              |                |                |
-           Metrics            Logs            Traces
-              |                |                |
-              v                v                v
-         Prometheus          Alloy        OpenTelemetry
-              |                |           Collector
-              |                v                |
-              |               Loki              v
-              |                |              Jaeger
-              +----------------+----------------+
-                               |
-                               v
-                            Grafana
+                          Online Boutique
+                                |
+              +-----------------+-----------------+
+              |                 |                 |
+              v                 v                 v
+          Prometheus           Alloy        OpenTelemetry
+              |                 |             Collector
+              |                 v                 |
+              |                Loki               v
+              |                 |               Jaeger
+              +-----------------+-----------------+
+                                |
+                                v
+                             Grafana
 ```
 
-The observability stack is intentionally split into independent layers so resource-intensive components do not need to remain active continuously.
+The stack is split into independent layers so resource-intensive components do not need to remain active continuously.
 
-## GitOps Deployment Model
+## Components
 
-Observability components are deployed through Argo CD.
+### Metrics
 
-```text
-Git
- ↓
-platform-root
- ↓
-Argo CD Applications
- ↓
-upstream Helm charts
- +
-local values
- ↓
-monitoring namespace
-```
+`kube-prometheus-stack` provides:
 
-The repository stores:
-
-* Argo CD Application definitions
-* pinned Helm chart versions
-* local Helm values
-* platform-specific configuration
-
-Upstream charts are not copied into the repository.
-
-## Metrics
-
-The metrics layer uses `kube-prometheus-stack`.
-
-It provides:
-
-* Prometheus
-* Grafana
-* Prometheus Operator
-* kube-state-metrics
-* node-exporter
-* Kubernetes dashboards
-* Kubernetes monitoring rules
+- Prometheus
+- Grafana
+- Prometheus Operator
+- kube-state-metrics
+- node-exporter
+- Kubernetes dashboards and rules
 
 Configuration:
 
@@ -101,25 +55,22 @@ Configuration:
 kube-prometheus-stack-values.yaml
 ```
 
-The local configuration is optimized for Kind and disables unnecessary control-plane monitoring targets.
+The local profile uses short retention and disables control-plane monitoring targets that provide limited value in Kind.
 
-Alertmanager is currently disabled because production alerting policies and SLO-based rules are outside the scope of the local environment.
+Alertmanager is currently disabled.
 
-Prometheus uses short retention suitable for development and functional validation.
+### Logging
 
-## Logging
-
-The logging layer consists of Grafana Alloy and Loki.
+Logging uses Grafana Alloy and Loki.
 
 ```text
-Kubernetes Pods
-Kubernetes Events
-        ↓
-      Alloy
-        ↓
-       Loki
-        ↓
-      Grafana
+Pod logs + Kubernetes Events
+             ↓
+           Alloy
+             ↓
+            Loki
+             ↓
+          Grafana
 ```
 
 Configuration:
@@ -129,38 +80,21 @@ alloy-values.yaml
 loki-values.yaml
 ```
 
-### Loki
+Loki runs in a lightweight monolithic configuration with ephemeral storage.
 
-Loki runs as a lightweight single-instance backend.
+Alloy runs as a single Deployment and collects selected logs through the Kubernetes API rather than mounting node log directories.
 
-The local deployment intentionally avoids distributed components and persistent storage.
+Collection is limited to:
 
-Log data is ephemeral and may be lost when the workload or Kind environment is recreated.
+```text
+online-boutique
+argocd
+monitoring
+```
 
-### Grafana Alloy
+### Tracing
 
-Alloy runs as a single Kubernetes Deployment.
-
-Logs are collected through the Kubernetes API rather than by mounting node log directories.
-
-This reduces the number of required Alloy instances on the local Kind cluster.
-
-Collection is restricted to selected namespaces:
-
-* `online-boutique`
-* `argocd`
-* `monitoring`
-
-Alloy collects:
-
-* Pod logs
-* Kubernetes Events
-
-and forwards them to Loki.
-
-## Distributed Tracing
-
-The tracing layer consists of OpenTelemetry Collector and Jaeger.
+Tracing uses OpenTelemetry Collector and Jaeger.
 
 ```text
 Online Boutique
@@ -185,11 +119,7 @@ opentelemetry-collector-values.yaml
 jaeger-values.yaml
 ```
 
-### OpenTelemetry Collector
-
-The Collector runs as a lightweight single Deployment.
-
-The local trace pipeline is:
+The Collector uses a minimal trace pipeline:
 
 ```text
 OTLP receiver
@@ -203,37 +133,91 @@ OTLP exporter
    Jaeger
 ```
 
-The application-facing endpoint is:
+Jaeger uses lightweight ephemeral storage suitable for local validation.
+
+## GitOps Deployment
+
+Observability components are deployed through Argo CD using upstream Helm charts and values stored in this directory.
+
+Application definitions are maintained under:
 
 ```text
-opentelemetry-collector.monitoring.svc.cluster.local:4317
+argocd/local/applications/
 ```
 
-### Jaeger
-
-Jaeger runs as a single-instance tracing backend.
-
-Trace storage is ephemeral in the local environment.
-
-Persistent and scalable storage is intentionally deferred to the future cloud environment.
-
-## Grafana
-
-Grafana is the primary interface for local telemetry.
-
-Configured datasources are:
+The local root reconciles:
 
 ```text
-Prometheus → metrics
-Loki       → logs
-Jaeger     → traces
+argocd/local/
 ```
 
-A datasource can remain configured while its backend is temporarily disabled.
+Upstream observability charts are referenced rather than copied into this repository.
 
-This allows observability layers to be switched independently without repeatedly changing Grafana configuration.
+## Online Boutique Tracing
 
-### Access
+Local Online Boutique values enable tracing through:
+
+```yaml
+global:
+  tracing:
+    enabled: true
+    collectorServiceAddress: "opentelemetry-collector.monitoring.svc.cluster.local:4317"
+```
+
+Supported workloads receive:
+
+```text
+ENABLE_TRACING=1
+COLLECTOR_SERVICE_ADDR=<collector endpoint>
+OTEL_SERVICE_NAME=<service name>
+```
+
+Tracing is enabled for:
+
+- frontend
+- checkoutservice
+- currencyservice
+- emailservice
+- paymentservice
+- productcatalogservice
+- recommendationservice
+
+## Workload Activation
+
+Active local Applications are selected through:
+
+```text
+argocd/local/applications/kustomization.yaml
+```
+
+This is the declarative switch for enabling or disabling observability layers.
+
+Typical combinations include:
+
+```text
+Metrics
+├── Online Boutique
+├── Prometheus
+└── Grafana
+
+Logging
+├── Online Boutique
+├── Prometheus/Grafana
+├── Loki
+└── Alloy
+
+Tracing
+├── Online Boutique
+├── Prometheus/Grafana
+├── OpenTelemetry Collector
+└── Jaeger
+```
+
+Manual `kubectl scale` is not used as an activation mechanism because Argo CD self-healing treats it as drift.
+
+## Validation
+
+### Grafana
 
 ```bash
 kubectl port-forward \
@@ -242,152 +226,7 @@ kubectl port-forward \
   3000:80
 ```
 
-Open:
-
-```text
-http://localhost:3000
-```
-
-## Argo CD Sync Order
-
-Observability Applications use Argo CD sync waves to express dependencies.
-
-```text
-Wave -1
-└── observability AppProject
-
-Wave 0
-└── metrics stack
-
-Wave 1
-├── Loki
-└── Jaeger
-
-Wave 2
-├── Alloy
-└── OpenTelemetry Collector
-```
-
-Telemetry backends are therefore declared before components that send data to them.
-
-## Local Workload Activation
-
-Not every observability component is expected to run continuously.
-
-Active Applications are selected through:
-
-```text
-argocd/kustomization.yaml
-```
-
-Typical local combinations include:
-
-```text
-Metrics
-├── Online Boutique
-├── Argo CD
-├── Prometheus
-└── Grafana
-```
-
-```text
-Logging
-├── Online Boutique
-├── Argo CD
-├── Prometheus / Grafana
-├── Loki
-└── Alloy
-```
-
-```text
-Tracing
-├── Online Boutique
-├── Argo CD
-├── Prometheus / Grafana
-├── OpenTelemetry Collector
-└── Jaeger
-```
-
-A full profile can be enabled temporarily for complete platform demonstrations and end-to-end validation.
-
-## Resource-Constrained Local Profile
-
-The local platform runs on a development workstation, so observability components use deliberately constrained Kubernetes resource budgets.
-
-### Metrics
-
-| Component group                             | CPU requests | Memory requests | CPU limits | Memory limits |
-| ------------------------------------------- | -----------: | --------------: | ---------: | ------------: |
-| Prometheus, Grafana and Prometheus Operator |         300m |         448 MiB |       850m |      1344 MiB |
-
-### Logging
-
-| Component | CPU requests | Memory requests | CPU limits | Memory limits |
-| --------- | -----------: | --------------: | ---------: | ------------: |
-| Loki      |         100m |         128 MiB |       300m |       512 MiB |
-| Alloy     |          50m |          64 MiB |       150m |       192 MiB |
-| **Total** |     **150m** |     **192 MiB** |   **450m** |   **704 MiB** |
-
-### Tracing
-
-| Component               | CPU requests | Memory requests | CPU limits | Memory limits |
-| ----------------------- | -----------: | --------------: | ---------: | ------------: |
-| OpenTelemetry Collector |          50m |          64 MiB |       150m |       192 MiB |
-| Jaeger                  |         100m |         128 MiB |       250m |       384 MiB |
-| **Total**               |     **150m** |     **192 MiB** |   **400m** |   **576 MiB** |
-
-These values represent explicitly configured Kubernetes requests and limits rather than total host resource consumption.
-
-Additional resources are consumed by components such as:
-
-* Kubernetes control plane
-* Argo CD
-* container runtime
-* Docker Desktop
-* WSL2
-* Kubernetes networking
-* host operating system
-
-The recommended workflow is therefore to enable only the observability layers required for the current development scenario.
-
-## Storage Model
-
-The local environment prioritizes reproducibility and low resource usage over telemetry durability.
-
-Prometheus, Loki and Jaeger therefore use development-oriented storage and retention settings.
-
-The future cloud environment can introduce:
-
-* persistent storage
-* longer telemetry retention
-* scalable deployment modes
-* managed or external backends
-* high availability
-* production alerting
-* SLO-based monitoring
-* cloud-native monitoring integrations
-
-## Quick Validation
-
-Verify Argo CD Applications:
-
-```bash
-kubectl get applications -n argocd
-```
-
-Verify monitoring workloads:
-
-```bash
-kubectl get pods -n monitoring
-```
-
-Verify Online Boutique workloads:
-
-```bash
-kubectl get pods -n online-boutique
-```
-
-Access Prometheus:
+### Prometheus
 
 ```bash
 kubectl port-forward \
@@ -396,7 +235,52 @@ kubectl port-forward \
   9090:9090
 ```
 
-Access Jaeger:
+### Loki
+
+```bash
+kubectl get pods \
+  -n monitoring \
+  -l app.kubernetes.io/name=loki
+```
+
+Readiness:
+
+```bash
+kubectl port-forward \
+  -n monitoring \
+  service/loki \
+  3100:3100
+
+curl http://localhost:3100/ready
+```
+
+### Alloy
+
+```bash
+kubectl get pods \
+  -n monitoring \
+  -l app.kubernetes.io/name=alloy
+
+kubectl logs \
+  -n monitoring \
+  -l app.kubernetes.io/name=alloy \
+  --tail=100
+```
+
+### OpenTelemetry Collector
+
+```bash
+kubectl rollout status \
+  deployment/opentelemetry-collector \
+  -n monitoring
+
+kubectl logs \
+  -n monitoring \
+  deployment/opentelemetry-collector \
+  --tail=100
+```
+
+### Jaeger
 
 ```bash
 kubectl port-forward \
@@ -405,12 +289,68 @@ kubectl port-forward \
   16686:16686
 ```
 
+After generating traffic, traces should contain spans from multiple participating Online Boutique services.
+
+### Application Tracing
+
+```bash
+kubectl get deployment frontend \
+  -n online-boutique \
+  -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}{"="}{.value}{"\n"}{end}' \
+  | grep -E 'ENABLE_TRACING|COLLECTOR_SERVICE_ADDR|OTEL_SERVICE_NAME'
+```
+
+Expected values include:
+
+```text
+ENABLE_TRACING=1
+COLLECTOR_SERVICE_ADDR=opentelemetry-collector.monitoring.svc.cluster.local:4317
+OTEL_SERVICE_NAME=frontend
+```
+
+Render local Online Boutique manifests:
+
+```bash
+helm template \
+  online-boutique \
+  applications/online-boutique/chart \
+  -f environments/local/online-boutique/values.yaml \
+  > /tmp/online-boutique-local.yaml
+```
+
+Seven workloads should receive tracing configuration:
+
+```bash
+grep -c 'name: ENABLE_TRACING' \
+  /tmp/online-boutique-local.yaml
+```
+
+Expected:
+
+```text
+7
+```
+
+## Local Resource Profile
+
+The local observability stack is intentionally optimized for low idle resource usage.
+
+Configured resource budgets currently include:
+
+| Layer | CPU requests | Memory requests | CPU limits | Memory limits |
+|---|---:|---:|---:|---:|
+| Metrics | 300m | 448 MiB | 850m | 1344 MiB |
+| Logging | 150m | 192 MiB | 450m | 704 MiB |
+| Tracing | 150m | 192 MiB | 400m | 576 MiB |
+
+These values represent explicitly configured Kubernetes requests and limits, not the complete host footprint.
+
+The complete local stack also consumes resources through Kubernetes, Argo CD, containerd, Docker Desktop and WSL2.
+
+The full observability profile should be enabled temporarily for end-to-end validation rather than kept as the default development state.
+
 ## Related Documentation
 
-For the overall GitOps architecture, see the [GitOps repository README](../../../README.md).
-
-For Argo CD Application lifecycle, sync behaviour and workload activation, see the [Argo CD documentation](../../../argocd/README.md).
-
-For application tracing configuration, see the [Online Boutique Helm Chart](../../../applications/online-boutique/chart/README.md).
-
-Detailed troubleshooting procedures should be maintained separately from this architecture-level README as operational runbooks are introduced.
+- [GitOps Repository](../../../README.md)
+- [Argo CD](../../../argocd/README.md)
+- [Online Boutique Helm Chart](../../../applications/online-boutique/chart/README.md)
