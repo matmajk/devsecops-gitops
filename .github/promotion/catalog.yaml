@@ -13,3 +13,8 @@ environments:
     chartPath: applications/online-boutique/chart
     namespace: online-boutique
     autoMerge: true
+  stage:
+    valuesFile: environments/gcp/stage/online-boutique/values.yaml
+    chartPath: applications/online-boutique/chart
+    namespace: online-boutique
+    autoMerge: false

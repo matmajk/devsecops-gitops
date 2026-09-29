@@ -193,7 +193,9 @@ Supported promotion targets are declared in:
 
 The workflow updates an immutable image version in the selected environment values file and creates a pull request.
 
-The currently validated automated promotion path targets the local environment. GCP stage promotion should be enabled only after the stage deployment path has been validated on GKE.
+The promotion catalog supports Product Catalog promotion to the local and GCP stage environments.
+
+Local CI-triggered promotion can use automatic merge, while GCP stage promotion remains reviewable and requires an explicit pull request merge.
 
 ## Argo CD
 
