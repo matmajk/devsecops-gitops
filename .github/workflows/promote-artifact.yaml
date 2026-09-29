@@ -220,6 +220,50 @@ jobs:
             echo "auto_merge=${AUTO_MERGE}"
           } >> "${GITHUB_OUTPUT}"
 
+      - name: Verify stage artifact eligibility
+        if: env.ENVIRONMENT == 'stage'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLICATION_REPOSITORY: ${{ vars.APPLICATION_REPOSITORY }}
+        run: |
+          set -euo pipefail
+
+          SOURCE_SHA="${IMAGE_TAG#ci-}"
+
+          if [[ ! "${SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid source SHA derived from image tag: ${IMAGE_TAG}" >&2
+            exit 1
+          fi
+
+          echo "Verifying stage artifact eligibility:"
+          echo "  service:    ${SERVICE}"
+          echo "  image tag:  ${IMAGE_TAG}"
+          echo "  source SHA: ${SOURCE_SHA}"
+          echo "  repository: ${APPLICATION_REPOSITORY}"
+
+          STATUS="$(
+            gh api \
+              "repos/${APPLICATION_REPOSITORY}/commits/${SOURCE_SHA}/statuses" \
+              --jq '
+                map(
+                  select(
+                    .context == "artifact/productcatalogservice/gar-stage"
+                  )
+                )
+                | first
+                | .state // ""
+              '
+          )"
+
+          if [[ "${STATUS}" != "success" ]]; then
+            echo "Artifact ${IMAGE_TAG} is not eligible for GCP stage promotion." >&2
+            echo "No successful verified GAR promotion was found for ${SOURCE_SHA}." >&2
+            exit 1
+          fi
+
+          echo "Verified GAR promotion evidence for ${IMAGE_TAG}."
+
       - name: Read current image tag
         id: state
         shell: bash
